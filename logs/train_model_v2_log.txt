@@ -1,0 +1,74 @@
+2026-03-30 23:53:21,679  INFO  === TTC Bus Delay — LightGBM v2 Training Script ===
+2026-03-30 23:53:21,681  INFO  Loading data from: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\data\processed\master_ttc_model_ready.csv
+2026-03-30 23:53:22,890  INFO  Loaded 644,819 rows × 16 columns
+2026-03-30 23:53:22,979  INFO  Split — train: 537,232  val: 52,721  test: 54,866
+2026-03-30 23:53:22,990  INFO  Train class balance — Not Severe: 65.6%  Severe: 34.4%
+2026-03-30 23:53:22,992  INFO  Val class balance — Not Severe: 54.8%  Severe: 45.2%
+2026-03-30 23:53:22,994  INFO  Test class balance — Not Severe: 53.3%  Severe: 46.7%
+2026-03-30 23:53:23,024  INFO  Route encoding built for 468 unique routes. Global rate: 0.344
+2026-03-30 23:53:24,160  INFO  Feature matrix shape (train): (537232, 37)
+2026-03-30 23:53:24,183  INFO  Training LightGBM classifier ...
+2026-03-30 23:53:33,148  INFO  Training complete.
+2026-03-30 23:53:33,605  INFO  
+============================================================
+  VALIDATE 2024 SET RESULTS
+============================================================
+2026-03-30 23:53:33,605  INFO  
+Classification Report:
+              precision    recall  f1-score   support
+
+  Not Severe       0.82      0.79      0.81     28877
+      Severe       0.76      0.79      0.77     23844
+
+    accuracy                           0.79     52721
+   macro avg       0.79      0.79      0.79     52721
+weighted avg       0.79      0.79      0.79     52721
+
+2026-03-30 23:53:33,605  INFO  Confusion Matrix:
+[[22934  5943]
+ [ 5030 18814]]
+2026-03-30 23:53:34,108  INFO  
+============================================================
+  TEST 2025 SET RESULTS
+============================================================
+2026-03-30 23:53:34,109  INFO  
+Classification Report:
+              precision    recall  f1-score   support
+
+  Not Severe       0.77      0.76      0.77     29238
+      Severe       0.73      0.74      0.73     25628
+
+    accuracy                           0.75     54866
+   macro avg       0.75      0.75      0.75     54866
+weighted avg       0.75      0.75      0.75     54866
+
+2026-03-30 23:53:34,109  INFO  Confusion Matrix:
+[[22317  6921]
+ [ 6740 18888]]
+2026-03-30 23:53:34,536  INFO  Confusion matrix saved: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\analysis\..\outputs\v2_confusion_matrix_validate_2024.png
+2026-03-30 23:53:34,750  INFO  Confusion matrix saved: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\analysis\..\outputs\v2_confusion_matrix_test_2025.png
+2026-03-30 23:53:35,151  INFO  Feature importance chart saved: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\analysis\..\outputs\v2_feature_importance.png
+2026-03-30 23:53:35,151  INFO  
+Top 20 features by importance:
+2026-03-30 23:53:35,151  INFO     1. Route_Severe_Rate                        8762.0000
+2026-03-30 23:53:35,151  INFO     2. Hour                                     3731.0000
+2026-03-30 23:53:35,152  INFO     3. Temp_C                                   2996.0000
+2026-03-30 23:53:35,152  INFO     4. Rel_Humidity_pct                         2482.0000
+2026-03-30 23:53:35,152  INFO     5. Wind_Spd_kmh                             2146.0000
+2026-03-30 23:53:35,152  INFO     6. Hour_x_Month                             2080.0000
+2026-03-30 23:53:35,152  INFO     7. Rush_x_Route_Rate                        1262.0000
+2026-03-30 23:53:35,153  INFO     8. Is_Weekend                               831.0000
+2026-03-30 23:53:35,153  INFO     9. Incident_Category_General Delay          772.0000
+2026-03-30 23:53:35,153  INFO    10. Month                                    717.0000
+2026-03-30 23:53:35,153  INFO    11. Visibility_km                            600.0000
+2026-03-30 23:53:35,153  INFO    12. Incident_Category_Diversion              460.0000
+2026-03-30 23:53:35,153  INFO    13. Incident_Category_Utilized Off Route     406.0000
+2026-03-30 23:53:35,153  INFO    14. Incident_Category_Late Departure         403.0000
+2026-03-30 23:53:35,154  INFO    15. Incident_Category_Mechanical             361.0000
+2026-03-30 23:53:35,154  INFO    16. Incident_Category_Operator               324.0000
+2026-03-30 23:53:35,154  INFO    17. Day_Sunday                               249.0000
+2026-03-30 23:53:35,154  INFO    18. Incident_Category_Collision              214.0000
+2026-03-30 23:53:35,154  INFO    19. Day_Friday                               210.0000
+2026-03-30 23:53:35,154  INFO    20. Incident_Category_Cleaning               207.0000
+2026-03-30 23:53:35,238  INFO  Model bundle saved: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\analysis\..\models\lgbm_ttc_bundle.pkl
+2026-03-30 23:53:35,239  INFO  === Script complete. ===

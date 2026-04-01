@@ -1,0 +1,13 @@
+# Large data files — don't push these to GitHub
+data/processed/master_ttc_eda_ready.csv
+data/processed/master_ttc_with_weather.csv
+data/processed/master_ttc_delays.csv
+data/processed/master_ttc_model_ready.csv
+data/raw/
+data/geocoding/
+
+# Python
+__pycache__/
+*.pkl
+*.pyc
+.env

@@ -1,0 +1,36 @@
+Weather join started: 2026-02-22 21:44:34
+
+[ LOADING TTC MASTER ]
+  TTC rows: 674,646
+  DateTime nulls: 0
+
+[ LOADING WEATHER ]
+  Raw weather rows: 96,432
+  Dropped 21 columns (flags, redundant, high-null)
+  Clean weather rows: 96,432
+  Weather range: 2015-01-01 00:00:00 → 2025-12-31 23:00:00
+
+[ CREATING JOIN KEYS ]
+  TTC unique hours:     90,207
+  Weather unique hours: 96,432
+
+[ MERGING ]
+  TTC rows before: 674,646
+  TTC rows after:  674,646
+
+[ JOIN QUALITY REPORT ]
+  Temp_C                    nulls:      179  (0.0%)
+  Dew_Point_C               nulls:      278  (0.0%)
+  Rel_Humidity_pct          nulls:      312  (0.0%)
+  Wind_Dir_10deg            nulls:    9,890  (1.5%)
+  Wind_Spd_kmh              nulls:      177  (0.0%)
+  Visibility_km             nulls:      180  (0.0%)
+  Stn_Pressure_kPa          nulls:      177  (0.0%)
+  Wind_Chill                nulls:  530,895  (78.7%)  ⚠️
+  Weather_Desc              nulls:  391,733  (58.1%)  ⚠️
+
+  Total rows:    674,646
+  Total columns: 22
+  Columns: ['Service_Date', 'Time', 'Route_Number', 'Day', 'Location', 'Incident_Code', 'Min_Delay', 'Min_Gap', 'Direction', 'Vehicle', 'Year', 'Source_File', 'Service_DateTime', 'Temp_C', 'Dew_Point_C', 'Rel_Humidity_pct', 'Wind_Dir_10deg', 'Wind_Spd_kmh', 'Visibility_km', 'Stn_Pressure_kPa', 'Wind_Chill', 'Weather_Desc']
+
+✅ Saved: master_ttc_with_weather.csv  (114.7 MB)

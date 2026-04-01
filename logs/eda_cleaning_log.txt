@@ -1,0 +1,59 @@
+EDA Cleaning started: 2026-02-25 19:23:54
+Loaded: 674,646 rows
+
+[ 1. CAPPING EXTREME DELAYS ]
+  Rows with delay >= 300 min (5 hrs): 5,665
+  Rows with delay >= 999 min:         1,376
+  Capped 5,482 rows to 300 min  (values were 300+ min, clearly erroneous)
+  New max delay: 300.0
+  Gap capped: 6,056 rows
+
+[ 2. FILTERING BAD ROUTE NUMBERS ]
+  Route range before: 0 → 898630
+  Bad route rows (< 1 or > 999): 42
+  Sample bad route values: [np.float64(3935.0), np.float64(7107.0), np.float64(9020.0), np.float64(9060.0), np.float64(9129.0), np.float64(9252.0), np.float64(9484.0), np.float64(9535.0), np.float64(9984.0), np.float64(9985.0)]
+  Route range after:  1 → 999
+  Total null routes now: 3,319
+
+[ 3. DERIVING EDA COLUMNS ]
+  Month, Hour, Season, Is_Rush_Hour, Is_Weekend, Is_Severe  → added
+
+  Season distribution:
+    Winter    170,118
+    Fall      168,461
+    Spring    168,092
+    Summer    167,975
+
+  Rush hour rows:   227,101  (33.7%)
+  Weekend rows:     140,192  (20.8%)
+  Severe delays:    234,101  (34.7%)
+
+[ 4. FINAL DATASET SUMMARY ]
+  Shape: 674,646 rows  x  28 columns
+  Columns: ['Service_Date', 'Time', 'Route_Number', 'Day', 'Location', 'Incident_Code', 'Min_Delay', 'Min_Gap', 'Direction', 'Vehicle', 'Year', 'Source_File', 'Service_DateTime', 'Temp_C', 'Dew_Point_C', 'Rel_Humidity_pct', 'Wind_Dir_10deg', 'Wind_Spd_kmh', 'Visibility_km', 'Stn_Pressure_kPa', 'Wind_Chill', 'Weather_Desc', 'Month', 'Hour', 'Season', 'Is_Rush_Hour', 'Is_Weekend', 'Is_Severe']
+
+  Null summary:
+    Route_Number                 3,319  (0.5%)
+    Location                       677  (0.1%)
+    Incident_Code                  935  (0.1%)
+    Min_Delay                      452  (0.1%)
+    Min_Gap                        909  (0.1%)
+    Direction                   62,431  (9.3%)
+    Vehicle                     55,791  (8.3%)
+    Temp_C                         179  (0.0%)
+    Dew_Point_C                    278  (0.0%)
+    Rel_Humidity_pct               312  (0.0%)
+    Wind_Dir_10deg               9,890  (1.5%)
+    Wind_Spd_kmh                   177  (0.0%)
+    Visibility_km                  180  (0.0%)
+    Stn_Pressure_kPa               177  (0.0%)
+    Wind_Chill                 530,895  (78.7%)
+    Weather_Desc               391,733  (58.1%)
+
+  Delay stats after capping:
+    Min:    0.0
+    Max:    300.0
+    Mean:   17.8
+    Median: 10.0
+
+✅ Saved: master_ttc_eda_ready.csv  (133.1 MB)
