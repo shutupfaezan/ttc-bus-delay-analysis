@@ -1,0 +1,108 @@
+2026-04-07 13:41:18,256  === TTC Bus Delay — LightGBM Regression v4 ===
+2026-04-07 13:41:18,257  Loading: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\analysis\..\data\processed\master_ttc_model_ready.csv
+2026-04-07 13:41:19,410  Loaded 642,892 rows × 16 columns
+2026-04-07 13:41:19,549  Split — train: 535,628  val: 52,573  test: 54,691
+2026-04-07 13:41:19,576  Train — mean: 17.9 min  median: 10.0 min  std: 34.4 min
+2026-04-07 13:41:19,579  Val — mean: 21.9 min  median: 12.0 min  std: 37.7 min
+2026-04-07 13:41:19,582  Test — mean: 21.6 min  median: 13.0 min  std: 35.9 min
+2026-04-07 13:41:19,694  Route encoding:      468 routes  |  global avg: 17.9 min
+2026-04-07 13:41:19,694  Incident encoding:   13 categories
+2026-04-07 13:41:19,695    Diversion                  avg delay: 96.5 min
+2026-04-07 13:41:19,695    Other                      avg delay: 48.1 min
+2026-04-07 13:41:19,695    Collision                  avg delay: 25.4 min
+2026-04-07 13:41:19,695    General Delay              avg delay: 19.4 min
+2026-04-07 13:41:19,696    Security                   avg delay: 15.0 min
+2026-04-07 13:41:19,696    Operator                   avg delay: 14.8 min
+2026-04-07 13:41:19,696    Emergency Services         avg delay: 13.8 min
+2026-04-07 13:41:19,697    Cleaning                   avg delay: 13.3 min
+2026-04-07 13:41:19,697    Vision                     avg delay: 13.2 min
+2026-04-07 13:41:19,697    Investigation              avg delay: 12.8 min
+2026-04-07 13:41:19,697    Mechanical                 avg delay: 12.2 min
+2026-04-07 13:41:19,697    Late Departure             avg delay: 10.5 min
+2026-04-07 13:41:19,698    Utilized Off Route         avg delay: 8.9 min
+2026-04-07 13:41:19,698  Diversion encoding:  263 routes  |  global diversion avg: 96.5 min
+2026-04-07 13:41:21,060  Feature matrix shape (train): (535628, 42)
+2026-04-07 13:41:21,062  Features (42): ['Hour', 'Month', 'Is_Rush_Hour', 'Is_Weekend', 'Temp_C', 'Visibility_km', 'Wind_Spd_kmh', 'Rel_Humidity_pct', 'Headway_min', 'Route_Delay_Avg', 'Incident_Delay_Avg', 'Diversion_Route_Avg', 'Incident_Route_Interaction', 'Headway_x_Route_Avg', 'Rush_x_Route_Avg', 'Hour_x_Month', 'Day_Friday', 'Day_Monday', 'Day_Saturday', 'Day_Sunday', 'Day_Thursday', 'Day_Tuesday', 'Day_Wednesday', 'Season_Fall', 'Season_Spring', 'Season_Summer', 'Season_Winter', 'Incident_Category_Cleaning', 'Incident_Category_Collision', 'Incident_Category_Diversion', 'Incident_Category_Emergency Services', 'Incident_Category_General Delay', 'Incident_Category_Investigation', 'Incident_Category_Late Departure', 'Incident_Category_Mechanical', 'Incident_Category_Operator', 'Incident_Category_Other', 'Incident_Category_Passenger', 'Incident_Category_Security', 'Incident_Category_Traffic', 'Incident_Category_Utilized Off Route', 'Incident_Category_Vision']
+2026-04-07 13:41:21,121  Training LightGBM regressor on log1p(Min_Delay) ...
+2026-04-07 13:41:33,702  Training complete.
+2026-04-07 13:41:34,263  
+============================================================
+2026-04-07 13:41:34,264    VALIDATE 2024
+2026-04-07 13:41:34,264  ============================================================
+2026-04-07 13:41:34,264    RMSE:           32.35 min
+2026-04-07 13:41:34,264    MAE:            9.91 min
+2026-04-07 13:41:34,264    R²:             0.2631
+2026-04-07 13:41:34,265    Within ±5 min:  66.1%
+2026-04-07 13:41:34,265    Within ±10 min: 85.1%
+2026-04-07 13:41:34,914  
+============================================================
+2026-04-07 13:41:34,914    TEST 2025
+2026-04-07 13:41:34,915  ============================================================
+2026-04-07 13:41:34,915    RMSE:           32.12 min
+2026-04-07 13:41:34,915    MAE:            11.12 min
+2026-04-07 13:41:34,915    R²:             0.2009
+2026-04-07 13:41:34,916    Within ±5 min:  60.0%
+2026-04-07 13:41:34,916    Within ±10 min: 80.3%
+2026-04-07 13:41:34,916  
+── Per-category breakdown ──
+2026-04-07 13:41:34,927    Cleaning                   MAE:   5.3 min  RMSE:   10.5 min  n=2,550
+2026-04-07 13:41:34,929    Collision                  n=2 — too few rows, skipped
+2026-04-07 13:41:34,933    Diversion                  MAE:  55.7 min  RMSE:   87.0 min  n=6,467
+2026-04-07 13:41:34,937    Emergency Services         MAE:   4.1 min  RMSE:    6.3 min  n=16,227
+2026-04-07 13:41:34,940    Late Departure             MAE:   5.2 min  RMSE:    7.3 min  n=148
+2026-04-07 13:41:34,945    Mechanical                 MAE:   7.4 min  RMSE:   25.3 min  n=5,473
+2026-04-07 13:41:34,947    Other                      n=2 — too few rows, skipped
+2026-04-07 13:41:34,951    Passenger                  MAE:  10.4 min  RMSE:   30.8 min  n=1,504
+2026-04-07 13:41:34,957    Security                   MAE:   4.7 min  RMSE:   11.3 min  n=3,147
+2026-04-07 13:41:34,962    Traffic                    MAE:   4.9 min  RMSE:    8.0 min  n=14,437
+2026-04-07 13:41:34,966    Utilized Off Route         MAE:   5.8 min  RMSE:    8.6 min  n=3,093
+2026-04-07 13:41:34,972    Vision                     MAE:   4.2 min  RMSE:    6.0 min  n=1,641
+2026-04-07 13:41:34,973  
+── v3 → v4 comparison (Validate 2024) ──
+2026-04-07 13:41:34,973    metric               v3        v4      change
+2026-04-07 13:41:34,973    --------------------------------------------
+2026-04-07 13:41:34,974    rmse              32.59     32.35     -0.24 ✓
+2026-04-07 13:41:34,974    mae               10.02      9.91     -0.11 ✓
+2026-04-07 13:41:34,974    r2                 0.25      0.26     +0.01 ✓
+2026-04-07 13:41:34,975    within_5          65.40     66.13     +0.73 ✓
+2026-04-07 13:41:34,975    within_10         84.60     85.14     +0.54 ✓
+2026-04-07 13:41:34,975  
+── v3 → v4 comparison (Test 2025) ──
+2026-04-07 13:41:34,975    metric               v3        v4      change
+2026-04-07 13:41:34,975    --------------------------------------------
+2026-04-07 13:41:34,975    rmse              32.12     32.12     +0.00 ✗
+2026-04-07 13:41:34,976    mae               11.10     11.12     +0.02 ✗
+2026-04-07 13:41:34,976    r2                 0.20      0.20     -0.00 ✗
+2026-04-07 13:41:34,976    within_5          59.70     59.98     +0.28 ✓
+2026-04-07 13:41:34,976    within_10         79.10     80.32     +1.22 ✓
+2026-04-07 13:41:35,520  
+Feature importance saved: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\analysis\..\outputs\v4_feature_importance.png
+2026-04-07 13:41:35,520  
+Top 20 features:
+2026-04-07 13:41:35,521     1. Diversion_Route_Avg                           6611.0000
+2026-04-07 13:41:35,521     2. Temp_C                                        6291.0000
+2026-04-07 13:41:35,521     3. Route_Delay_Avg                               6158.0000
+2026-04-07 13:41:35,521     4. Incident_Route_Interaction                    5399.0000
+2026-04-07 13:41:35,522     5. Headway_x_Route_Avg                           5304.0000
+2026-04-07 13:41:35,522     6. Hour                                          4967.0000
+2026-04-07 13:41:35,522     7. Rel_Humidity_pct                              4920.0000
+2026-04-07 13:41:35,522     8. Hour_x_Month                                  4669.0000
+2026-04-07 13:41:35,522     9. Wind_Spd_kmh                                  4086.0000
+2026-04-07 13:41:35,522    10. Headway_min                                   3866.0000
+2026-04-07 13:41:35,523    11. Incident_Delay_Avg                            2457.0000
+2026-04-07 13:41:35,523    12. Month                                         1930.0000
+2026-04-07 13:41:35,523    13. Rush_x_Route_Avg                              1578.0000
+2026-04-07 13:41:35,523    14. Visibility_km                                 1162.0000
+2026-04-07 13:41:35,524    15. Is_Weekend                                    982.0000
+2026-04-07 13:41:35,524    16. Incident_Category_General Delay               531.0000
+2026-04-07 13:41:35,524    17. Day_Saturday                                  411.0000
+2026-04-07 13:41:35,524    18. Season_Summer                                 381.0000
+2026-04-07 13:41:35,524    19. Season_Spring                                 375.0000
+2026-04-07 13:41:35,524    20. Incident_Category_Late Departure              344.0000
+2026-04-07 13:41:36,169  Predicted vs actual saved: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\analysis\..\outputs\v4_pred_vs_actual_validate_2024.png
+2026-04-07 13:41:36,994  Predicted vs actual saved: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\analysis\..\outputs\v4_pred_vs_actual_test_2025.png
+2026-04-07 13:41:37,273  Residuals saved: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\analysis\..\outputs\v4_residuals_validate_2024.png
+2026-04-07 13:41:37,594  Residuals saved: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\analysis\..\outputs\v4_residuals_test_2025.png
+2026-04-07 13:41:37,736  
+Model bundle saved: C:\Users\faeza\OneDrive\Desktop\Open_data_TTC_files\analysis\..\models\lgbm_ttc_regressor_bundle.pkl
+2026-04-07 13:41:37,736  === Script complete. ===

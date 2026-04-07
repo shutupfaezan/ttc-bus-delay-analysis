@@ -1,0 +1,71 @@
+prepare_eda_master started: 2026-04-07 18:08:04
+
+[ STEP 1 — LOAD BASE DATA ]
+  Rows loaded: 674,646  |  Columns: 28
+
+[ STEP 2 — SELECT COLUMNS ]
+  Columns selected: ['Service_Date', 'Route_Number', 'Day', 'Hour', 'Month', 'Year', 'Season', 'Is_Rush_Hour', 'Is_Weekend', 'Min_Delay', 'Is_Severe', 'Incident_Code', 'Vehicle', 'Location', 'Temp_C', 'Visibility_km', 'Wind_Spd_kmh', 'Rel_Humidity_pct']
+
+[ STEP 3 — DERIVE COLUMNS ]
+  Incident_Category: 673,710 mapped  |  936 unmapped (kept as null)
+  Is_Severe (>=15 min):  234,101 rows (34.7%)
+  Is_Severe_30 (>=30 min): 64,106 rows (9.5%)
+  Vehicle: 600,160 non-null  |  74,486 null
+
+[ STEP 4 — JOIN HEADWAY ]
+  Rows before/after: 674,646 / 674,646
+  Null headway filled with median (3.9 min): 67,962 rows
+
+[ STEP 5 — JOIN GEOCODED LOCATIONS ]
+  Geocoded locations loaded: 1,712 with valid coords
+  Rows with geocoords: 189,953 (28.2%)
+
+[ STEP 6 — SPATIAL JOIN TO NEIGHBOURHOODS ]
+  Neighbourhood polygons loaded: 158
+  Assigning neighbourhoods (this may take 1-2 min) ...
+  Rows assigned to neighbourhood: 185,081 (27.4%)
+
+[ STEP 7 — JOIN POPULATION DATA ]
+  Population data loaded: 158 neighbourhoods
+  Population range: 6260 → 33300
+  Area computed for 158 neighbourhoods
+  Area range: 0.40 → 30.15 km²
+  Density range: 861 → 42739 people/km²
+  Rows with population density: 180,802 (26.8%)
+
+[ STEP 8 — FINAL COLUMN ORDER ]
+  Final columns (27): ['Service_Date', 'Year', 'Month', 'Day', 'Hour', 'Season', 'Route_Number', 'Headway_min', 'Incident_Code', 'Incident_Category', 'Vehicle', 'Min_Delay', 'Is_Severe', 'Is_Severe_30', 'Is_Rush_Hour', 'Is_Weekend', 'Temp_C', 'Visibility_km', 'Wind_Spd_kmh', 'Rel_Humidity_pct', 'Location', 'Lat', 'Lon', 'Neighbourhood', 'Population', 'Area_km2', 'Population_Density']
+
+[ STEP 9 — NULL SUMMARY ]
+  Route_Number               nulls:    3,319  (0.5%)
+  Incident_Code              nulls:      935  (0.1%)
+  Incident_Category          nulls:      936  (0.1%)
+  Vehicle                    nulls:   74,486  (11.0%)
+  Min_Delay                  nulls:      452  (0.1%)
+  Temp_C                     nulls:      179  (0.0%)
+  Visibility_km              nulls:      180  (0.0%)
+  Wind_Spd_kmh               nulls:      177  (0.0%)
+  Rel_Humidity_pct           nulls:      312  (0.0%)
+  Location                   nulls:      677  (0.1%)
+  Lat                        nulls:  484,693  (71.8%)
+  Lon                        nulls:  484,693  (71.8%)
+  Neighbourhood              nulls:  489,565  (72.6%)
+  Population                 nulls:  493,844  (73.2%)
+  Area_km2                   nulls:  493,844  (73.2%)
+  Population_Density         nulls:  493,844  (73.2%)
+
+[ SAVING ]
+  Saved: ../data/processed/master_ttc_eda_master.csv  (97.0 MB)
+  Rows:    674,646
+  Columns: 27
+
+============================================================
+MASTER EDA CSV READY
+============================================================
+  File: master_ttc_eda_master.csv
+  This is the single file for all team EDA work.
+  Covers: PBI 1, 2, 3, Vehicle Intel, YoY Trend,
+          Incident Treemap, Severe Rate, Top N Routes
+  Neighbourhood columns populated only after geocoding completes.
+
+prepare_eda_master complete: 2026-04-07 18:09:23

@@ -1,0 +1,89 @@
+prepare_model_v2 started: 2026-04-01 11:21:22
+Target: Min_Delay (regression — minutes behind schedule)
+
+[ LOADING ]
+  Rows loaded:  674,646
+  Columns:      28
+
+[ STEP 1 — DROP ZERO AND NULL DELAY ROWS ]
+  Rows removed (Min_Delay = 0 or null): 29,827
+  Rows remaining:                       644,819
+
+[ STEP 2 — INCIDENT CODE UNIFICATION ]
+  Mapped:   643,890 rows
+  Unmapped: 929 rows (will be dropped — no category = unusable for ops model)
+  Rows dropped (unmapped incident):  929
+  Rows remaining:                    643,890
+
+  Category distribution:
+    Mechanical                 207,120  avg delay: 12.4 min
+    Utilized Off Route          75,141  avg delay: 9.4 min
+    General Delay               62,016  avg delay: 19.6 min
+    Late Departure              57,457  avg delay: 10.5 min
+    Operator                    49,673  avg delay: 14.9 min
+    Investigation               42,904  avg delay: 12.9 min
+    Diversion                   41,558  avg delay: 93.3 min
+    Emergency Services          33,515  avg delay: 13.9 min
+    Cleaning                    19,896  avg delay: 14.1 min
+    Security                    16,420  avg delay: 15.3 min
+    Collision                   15,547  avg delay: 22.7 min
+    Traffic                     14,470  avg delay: 15.2 min
+    Vision                       6,643  avg delay: 13.8 min
+    Passenger                    1,507  avg delay: 20.7 min
+    Other                           23  avg delay: 45.3 min
+
+[ STEP 3 — DROP ROWS WITH NULL FEATURES ]
+  Rows dropped (null features): 998
+  Rows remaining:               642,892
+
+[ STEP 4 — SELECT MODEL COLUMNS ]
+  Columns selected: ['Min_Delay', 'Route_Number', 'Hour', 'Month', 'Day', 'Season', 'Is_Rush_Hour', 'Is_Weekend', 'Temp_C', 'Visibility_km', 'Wind_Spd_kmh', 'Rel_Humidity_pct', 'Incident_Category', 'Year', 'Service_Date']
+
+[ STEP 5 — ENCODE BOOLEANS ]
+  Is_Rush_Hour → 0/1 integer
+  Is_Weekend → 0/1 integer
+
+[ STEP 6 — TARGET VARIABLE SUMMARY ]
+  Target: Min_Delay (minutes behind schedule)
+  Min:    1 min
+  Max:    300 min
+  Mean:   18.6 min
+  Median: 10.0 min
+  Std:    34.8 min
+
+  Distribution buckets:
+      0–5   min:    80,979  (12.6%)
+      5–10  min:   241,848  (37.6%)
+     10–15  min:   126,728  (19.7%)
+     15–30  min:   157,467  (24.5%)
+     30–60  min:    14,614  (2.3%)
+     60–300 min:    21,256  (3.3%)
+
+  Year split preview (for time-based train/val/test):
+    2015:   75,480 rows  avg delay: 14.9 min
+    2016:   76,447 rows  avg delay: 15.8 min
+    2017:   69,498 rows  avg delay: 16.6 min
+    2018:   73,098 rows  avg delay: 19.9 min
+    2019:   60,210 rows  avg delay: 18.7 min
+    2020:   34,494 rows  avg delay: 18.8 min
+    2021:   39,784 rows  avg delay: 18.9 min
+    2022:   55,358 rows  avg delay: 19.7 min
+    2023:   51,259 rows  avg delay: 20.4 min
+    2024:   52,573 rows  avg delay: 21.9 min
+    2025:   54,691 rows  avg delay: 21.6 min
+
+[ SAVING ]
+  Saved: ../data/processed/master_ttc_model_ready.csv  (50.8 MB)
+  Rows:    642,892
+  Columns: 15
+
+============================================================
+READY FOR TRAINING
+============================================================
+  Target:    Min_Delay (continuous regression)
+  Train:     Year <= 2023
+  Validate:  Year == 2024
+  Test:      Year == 2025
+  Next step: run train_model_v3.py
+
+prepare_model_v2 complete: 2026-04-01 11:21:37

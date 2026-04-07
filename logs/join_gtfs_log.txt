@@ -1,0 +1,100 @@
+join_gtfs started: 2026-04-07 13:38:14
+
+[ LOADING GTFS FILES ]
+  routes.txt total:    230 routes
+    route_type 0 (streetcar): 19
+    route_type 1 (subway): 3
+    route_type 3 (bus): 208
+  Bus routes kept:     208
+  Bus route range:     7 → 996
+  trips.txt:           135,534 trips loaded
+  Bus trips kept:      110,862
+  stop_times.txt:      loading in chunks (204MB) ...
+  Bus first-stop departures: 110,862
+
+[ PARSING DEPARTURE HOURS ]
+  Unique hours parsed: 24
+
+[ JOINING GTFS TABLES ]
+  Final joined rows:   110,862
+  Unique bus routes:   208
+
+  Hour distribution (bus departures only):
+    Hour 00: 4,174 scheduled bus departures
+    Hour 01: 2,726 scheduled bus departures
+    Hour 02: 1,148 scheduled bus departures
+    Hour 03: 652 scheduled bus departures
+    Hour 04: 890 scheduled bus departures
+    Hour 05: 2,841 scheduled bus departures
+    Hour 06: 4,564 scheduled bus departures
+    Hour 07: 5,194 scheduled bus departures
+    Hour 08: 5,835 scheduled bus departures
+    Hour 09: 5,597 scheduled bus departures
+    Hour 10: 5,479 scheduled bus departures
+    Hour 11: 5,592 scheduled bus departures
+    Hour 12: 5,798 scheduled bus departures
+    Hour 13: 5,822 scheduled bus departures
+    Hour 14: 6,074 scheduled bus departures
+    Hour 15: 6,186 scheduled bus departures
+    Hour 16: 6,159 scheduled bus departures
+    Hour 17: 6,129 scheduled bus departures
+    Hour 18: 6,035 scheduled bus departures
+    Hour 19: 5,226 scheduled bus departures
+    Hour 20: 4,991 scheduled bus departures
+    Hour 21: 4,911 scheduled bus departures
+    Hour 22: 4,541 scheduled bus departures
+    Hour 23: 4,298 scheduled bus departures
+
+[ COMPUTING HEADWAY ]
+  Computing per-route per-hour headway ...
+  Headway lookup rows: 3,592  (bus route × hour combinations)
+  Headway range:       1.0 → 40.0 min
+  Mean headway:        5.3 min
+  Median headway:      3.9 min
+
+  Top 10 least frequent bus routes (highest headway):
+    Route   403:  37.8 min avg headway
+    Route   402:  30.0 min avg headway
+    Route   167:  29.2 min avg headway
+    Route   162:  18.9 min avg headway
+    Route   343:  17.8 min avg headway
+    Route   324:  17.3 min avg headway
+    Route   938:  15.0 min avg headway
+    Route   169:  15.0 min avg headway
+    Route   384:  14.8 min avg headway
+    Route    10:  14.6 min avg headway
+
+  Top 10 most frequent bus routes (lowest headway):
+    Route    72:  2.1 min avg headway
+    Route    86:  2.0 min avg headway
+    Route   102:  2.0 min avg headway
+    Route    52:  2.0 min avg headway
+    Route    84:  2.0 min avg headway
+    Route    43:  2.0 min avg headway
+    Route    29:  2.0 min avg headway
+    Route   927:  1.9 min avg headway
+    Route    63:  1.8 min avg headway
+    Route    47:  1.8 min avg headway
+
+  Headway lookup saved: ../data/processed/gtfs_headway_lookup.csv
+
+[ JOINING HEADWAY TO MODEL DATA ]
+  Dropped stale Headway_min column from previous run
+  Model-ready rows:    642,892
+  Null headway filled with bus median (3.9 min): 59,456 rows
+  Final null headway:  0
+
+[ BUS HEADWAY FEATURE SUMMARY ]
+  Min:    1.0 min
+  Median: 2.5 min
+  Mean:   3.2 min
+  Max:    38.0 min
+
+[ SAVING ]
+  Saved: ../data/processed/master_ttc_model_ready.csv  (53.2 MB)
+  Rows:    642,892
+  Columns: 16
+  Columns: ['Min_Delay', 'Route_Number', 'Hour', 'Month', 'Day', 'Season', 'Is_Rush_Hour', 'Is_Weekend', 'Temp_C', 'Visibility_km', 'Wind_Spd_kmh', 'Rel_Humidity_pct', 'Incident_Category', 'Year', 'Service_Date', 'Headway_min']
+
+join_gtfs complete: 2026-04-07 13:38:27
+Next step: run train_model_v4.py
