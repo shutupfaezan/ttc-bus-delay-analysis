@@ -1,6 +1,7 @@
 """
-app.py — TTC Bus Delay Analytics Dashboard
-Run with: python -m streamlit run app.py  (from app/ folder)
+deploy/app.py — TTC Bus Delay Analytics Dashboard (Deployment Version)
+Reads pre-aggregated CSVs from deploy/data/ — no large files needed.
+Run with: python -m streamlit run app.py
 """
 import os
 import pickle
@@ -13,16 +14,14 @@ from datetime import datetime, date, time
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 APP_DIR    = os.path.dirname(os.path.abspath(__file__))
-ROOT       = os.path.dirname(APP_DIR)
-DATA_PATH  = os.path.join(ROOT, "data", "processed", "master_ttc_eda_master.csv")
-MODEL_PATH = os.path.join(ROOT, "models", "lgbm_ttc_regressor_bundle.pkl")
+DATA_DIR   = os.path.join(APP_DIR, "data")
+MODEL_PATH = os.path.join(APP_DIR, "models", "lgbm_ttc_regressor_bundle.pkl")
 
 # ── Design tokens ──────────────────────────────────────────────────────────────
 RED      = "#b50303"
 RED_DARK = "#93000a"
 RED_MID  = "#dc2626"
 NAVY     = "#0f172a"
-SURFACE  = "#f8f9fa"
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -37,12 +36,10 @@ _css_path = os.path.join(APP_DIR, "style.css")
 with open(_css_path) as _f:
     st.html(f"<style>{_f.read()}</style>")
 
-# ── Data ──────────────────────────────────────────────────────────────────────
+# ── Load pre-aggregated data ──────────────────────────────────────────────────
 @st.cache_data
-def load_data():
-    df = pd.read_csv(DATA_PATH, low_memory=False)
-    df["Service_Date"] = pd.to_datetime(df["Service_Date"], errors="coerce")
-    return df
+def load_csv(name):
+    return pd.read_csv(os.path.join(DATA_DIR, name))
 
 @st.cache_resource
 def load_model():
@@ -51,9 +48,23 @@ def load_model():
     with open(MODEL_PATH, "rb") as f:
         return pickle.load(f)
 
-df     = load_data()
-df_del = df[df["Min_Delay"] > 0].copy()
-bundle = load_model()
+kpi        = load_csv("kpi.csv").iloc[0]
+yoy        = load_csv("yoy.csv")
+monthly    = load_csv("monthly.csv")
+route_sum  = load_csv("route_summary.csv")
+inc        = load_csv("incident_summary.csv")
+vi         = load_csv("vehicle_intel.csv")
+temp_agg   = load_csv("weather_temp.csv")
+vis_agg    = load_csv("weather_vis.csv")
+wind_agg   = load_csv("weather_wind.csv")
+seasonal   = load_csv("seasonal.csv")
+bundle     = load_model()
+
+hw_path    = os.path.join(DATA_DIR, "gtfs_headway_lookup.csv")
+hw_df      = pd.read_csv(hw_path) if os.path.exists(hw_path) else None
+
+nbhd_path  = os.path.join(DATA_DIR, "neighbourhood.csv")
+nbhd       = pd.read_csv(nbhd_path) if os.path.exists(nbhd_path) else None
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -72,12 +83,9 @@ with st.sidebar:
         ],
     )
     st.divider()
-    st.caption("Data: 2015–2025 · 674k records\nModel: LightGBM v4")
+    st.caption("Data: 2015–2025 · 644k incidents\nModel: LightGBM v4")
 
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# HELPERS
-# ═══════════════════════════════════════════════════════════════════════════════
+# ── Helpers ───────────────────────────────────────────────────────────────────
 def section_header(eyebrow, heading):
     st.markdown(f'<p class="section-eyebrow">{eyebrow}</p>', unsafe_allow_html=True)
     st.markdown(f'<p class="section-heading">{heading}</p>', unsafe_allow_html=True)
@@ -87,11 +95,8 @@ def card_title(text):
 
 def plotly_defaults(fig, height=300):
     fig.update_layout(
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        font_family="Inter",
-        margin=dict(l=0, r=0, t=8, b=0),
-        height=height,
+        plot_bgcolor="white", paper_bgcolor="white",
+        font_family="Inter", margin=dict(l=0, r=0, t=8, b=0), height=height,
     )
     return fig
 
@@ -108,40 +113,29 @@ if "Dashboard" in page:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown('<span class="badge-live">● SYSTEM LIVE</span>', unsafe_allow_html=True)
 
-    # KPI values
-    total  = len(df_del)
-    avg_d  = df_del["Min_Delay"].mean()
-    sev    = df_del["Is_Severe"].mean() * 100
-    sev30  = df_del["Is_Severe_30"].mean() * 100
-    ly     = df_del[df_del["Year"] == df_del["Year"].max()]
-    py     = df_del[df_del["Year"] == df_del["Year"].max() - 1]
-    yoy_n  = ((len(ly) - len(py)) / len(py) * 100) if len(py) else 0
-    yoy_d  = ly["Min_Delay"].mean() - py["Min_Delay"].mean()
-
-    # ── 4 KPI cards ───────────────────────────────────────────────────────────
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(f"""
         <div class="ttc-card">
           <div class="kpi-label">Total Incidents</div>
-          <div class="kpi-value-red">{total:,}</div>
-          <div class="kpi-change-{'up' if yoy_n < 0 else 'down'}">
-            {'↓' if yoy_n < 0 else '↑'} {abs(yoy_n):.1f}% vs prior year
+          <div class="kpi-value-red">{int(kpi['total_incidents']):,}</div>
+          <div class="kpi-change-{'up' if kpi['yoy_incident_pct'] < 0 else 'down'}">
+            {'↓' if kpi['yoy_incident_pct'] < 0 else '↑'} {abs(kpi['yoy_incident_pct']):.1f}% vs prior year
           </div>
         </div>""", unsafe_allow_html=True)
     with k2:
         st.markdown(f"""
         <div class="ttc-card">
           <div class="kpi-label">Avg Delay Duration</div>
-          <span class="kpi-value-dark">{avg_d:.0f}</span>
+          <span class="kpi-value-dark">{kpi['avg_delay']:.0f}</span>
           <span class="kpi-unit"> min</span>
-          <div class="kpi-change-down">↑ {abs(yoy_d):.1f} min vs prior year</div>
+          <div class="kpi-change-down">↑ {abs(kpi['yoy_delay_min']):.1f} min vs prior year</div>
         </div>""", unsafe_allow_html=True)
     with k3:
         st.markdown(f"""
         <div class="ttc-card">
           <div class="kpi-label">Severe Rate (≥15 min)</div>
-          <span class="kpi-value-dark">{sev:.0f}</span>
+          <span class="kpi-value-dark">{kpi['severe_rate']:.0f}</span>
           <span class="kpi-unit"> %</span>
           <div class="kpi-change-down">of all delays are severe</div>
         </div>""", unsafe_allow_html=True)
@@ -149,29 +143,20 @@ if "Dashboard" in page:
         st.markdown(f"""
         <div class="ttc-card">
           <div class="kpi-label">Critical Rate (≥30 min)</div>
-          <span class="kpi-value-dark">{sev30:.0f}</span>
+          <span class="kpi-value-dark">{kpi['severe_30_rate']:.0f}</span>
           <span class="kpi-unit"> %</span>
           <div class="kpi-change-down">require urgent response</div>
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── YoY trend + severity ──────────────────────────────────────────────────
-    yoy = df_del.groupby("Year").agg(
-        Incidents=("Min_Delay", "count"),
-        Avg_Delay=("Min_Delay", "mean"),
-        Severe_Rate=("Is_Severe", "mean"),
-    ).reset_index()
-
     c1, c2 = st.columns([2, 1])
     with c1:
         with st.container(border=True):
             card_title("Delay Trends — Year over Year")
             fig = go.Figure()
-            fig.add_bar(
-                x=yoy["Year"], y=yoy["Incidents"],
-                marker_color=[f"rgba(181,3,3,{0.15 + 0.75*i/len(yoy)})" for i in range(len(yoy))],
-            )
+            fig.add_bar(x=yoy["Year"], y=yoy["Incidents"],
+                marker_color=[f"rgba(181,3,3,{0.15 + 0.75*i/len(yoy)})" for i in range(len(yoy))])
             fig = plotly_defaults(fig, 270)
             fig.update_layout(showlegend=False,
                 xaxis=dict(showgrid=False, tickfont=dict(color="#94a3b8", size=11)),
@@ -182,12 +167,8 @@ if "Dashboard" in page:
         with st.container(border=True):
             card_title("Severity Trend")
             fig2 = go.Figure()
-            fig2.add_scatter(
-                x=yoy["Year"], y=(yoy["Severe_Rate"]*100).round(1),
-                mode="lines+markers",
-                line=dict(color=RED, width=2.5),
-                marker=dict(color=RED, size=6),
-            )
+            fig2.add_scatter(x=yoy["Year"], y=(yoy["Severe_Rate"]*100).round(1),
+                mode="lines+markers", line=dict(color=RED, width=2.5), marker=dict(color=RED, size=6))
             fig2 = plotly_defaults(fig2, 270)
             fig2.update_layout(showlegend=False,
                 xaxis=dict(showgrid=False, tickfont=dict(color="#94a3b8", size=11)),
@@ -195,16 +176,6 @@ if "Dashboard" in page:
             st.plotly_chart(fig2, use_container_width=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # ── Monthly patterns ──────────────────────────────────────────────────────
-    monthly = df_del.groupby("Month").agg(
-        Avg_Delay=("Min_Delay", "mean"),
-        Severe_Rate=("Is_Severe", "mean"),
-    ).reset_index()
-    monthly["Month_Name"] = monthly["Month"].map({
-        1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",
-        7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"})
-
     with st.container(border=True):
         card_title("Monthly Delay Patterns (avg across all years)")
         fig3 = go.Figure()
@@ -219,8 +190,7 @@ if "Dashboard" in page:
             xaxis=dict(showgrid=False, tickfont=dict(color="#94a3b8", size=11)),
             yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(color="#94a3b8", size=11)),
             yaxis2=dict(overlaying="y", side="right", tickfont=dict(color="#94a3b8", size=11),
-                        ticksuffix="%", showgrid=False),
-        )
+                        ticksuffix="%", showgrid=False))
         st.plotly_chart(fig3, use_container_width=True)
 
 
@@ -230,16 +200,6 @@ if "Dashboard" in page:
 elif "Route Analysis" in page:
 
     section_header("Operational Analytics", "Route Performance")
-
-    route_sum = (
-        df_del.groupby("Route_Number")
-        .agg(Incidents=("Min_Delay","count"), Avg_Delay=("Min_Delay","mean"),
-             Severe_Rate=("Is_Severe","mean"), Avg_Headway=("Headway_min","mean"))
-        .round(2).query("Incidents >= 100").reset_index()
-    )
-    route_sum["Risk_Score"] = (
-        route_sum["Avg_Delay"] * route_sum["Avg_Headway"] * route_sum["Severe_Rate"]
-    ).round(2)
 
     c1, c2 = st.columns([1, 2])
     with c1:
@@ -257,21 +217,17 @@ elif "Route Analysis" in page:
             Highest incident frequency · avg {worst['Avg_Delay']:.1f} min delay
           </div>
           <div style="border-top:1px solid #e2e8f0;padding-top:16px;display:flex;justify-content:space-between;">
-            <span style="font-family:Inter,sans-serif;font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">
-              Total incidents
-            </span>
-            <span style="font-family:Inter,sans-serif;font-weight:500;font-size:12px;color:#0f172a;">
-              {int(worst['Incidents']):,}
-            </span>
+            <span style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Total incidents</span>
+            <span style="font-weight:500;font-size:12px;color:#0f172a;">{int(worst['Incidents']):,}</span>
           </div>
         </div>""", unsafe_allow_html=True)
 
     with c2:
         with st.container(border=True):
             card_title("Route Efficiency Leaderboard — Top 15 by Incidents")
-            top15    = route_sum.sort_values("Incidents", ascending=False).head(15)
-            max_d    = top15["Avg_Delay"].max()
-            colors   = [RED, RED, RED_MID, RED_MID] + ["#f87171"] * 11
+            top15  = route_sum.sort_values("Incidents", ascending=False).head(15)
+            max_d  = top15["Avg_Delay"].max()
+            colors = [RED, RED, RED_MID, RED_MID] + ["#f87171"] * 11
             for i, (_, row) in enumerate(top15.iterrows(), 1):
                 pct = int(row["Avg_Delay"] / max_d * 100)
                 st.markdown(f"""
@@ -297,7 +253,7 @@ elif "Route Analysis" in page:
     st.markdown("<br>", unsafe_allow_html=True)
     with st.container(border=True):
         card_title("Route Risk Profile — High Delay × Low Frequency")
-        st.caption("Risk Score = Avg Delay × Headway × Severe Rate. Larger bubble = more incidents.")
+        st.caption("Risk Score = Avg Delay × Headway × Severe Rate. Larger = more incidents.")
         top_risk = route_sum.sort_values("Risk_Score", ascending=False).head(20)
         fig_r = px.scatter(top_risk, x="Avg_Headway", y="Avg_Delay",
             size="Incidents", color="Severe_Rate",
@@ -320,36 +276,26 @@ elif "Weather Impact" in page:
     with c1:
         with st.container(border=True):
             card_title("Temperature vs Avg Delay Duration")
-            dw = df_del.dropna(subset=["Temp_C"]).copy()
-            dw["Temp_Band"] = pd.cut(dw["Temp_C"],
-                bins=[-35,-15,0,5,15,25,45],
-                labels=["Extreme Cold\n(<-15°C)","Cold\n(-15–0°C)","Cool\n(0–5°C)",
-                        "Mild\n(5–15°C)","Warm\n(15–25°C)","Hot\n(25°C+)"])
-            ta = dw.groupby("Temp_Band", observed=True)["Min_Delay"].mean().reset_index()
             fig_t = go.Figure()
-            fig_t.add_bar(x=ta["Temp_Band"].astype(str), y=ta["Min_Delay"].round(1),
-                marker_color=[RED if v > ta["Min_Delay"].mean() else "#fca5a5" for v in ta["Min_Delay"]])
+            fig_t.add_bar(x=temp_agg["Temp_Band"].astype(str), y=temp_agg["Avg_Delay"].round(1),
+                marker_color=[RED if v > temp_agg["Avg_Delay"].mean() else "#fca5a5" for v in temp_agg["Avg_Delay"]])
             fig_t = plotly_defaults(fig_t, 290)
             fig_t.update_layout(showlegend=False,
-                xaxis=dict(showgrid=False, tickfont=dict(color="#94a3b8",size=11)),
-                yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(color="#94a3b8",size=11)))
+                xaxis=dict(showgrid=False, tickfont=dict(color="#94a3b8", size=11)),
+                yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(color="#94a3b8", size=11)))
             st.plotly_chart(fig_t, use_container_width=True)
 
     with c2:
         with st.container(border=True):
             card_title("Visibility Impact")
-            dv = df_del.dropna(subset=["Visibility_km"]).copy()
-            dv["Vis_Band"] = pd.cut(dv["Visibility_km"],
-                bins=[0,1,5,15,100], labels=["<1km","1–5km","5–15km","15km+"])
-            va = dv.groupby("Vis_Band", observed=True)["Min_Delay"].mean().reset_index()
-            for _, row in va.iterrows():
-                pct   = int(row["Min_Delay"] / va["Min_Delay"].max() * 100)
-                color = RED if row["Min_Delay"] > va["Min_Delay"].mean() else "#fca5a5"
+            for _, row in vis_agg.iterrows():
+                pct   = int(row["Avg_Delay"] / vis_agg["Avg_Delay"].max() * 100)
+                color = RED if row["Avg_Delay"] > vis_agg["Avg_Delay"].mean() else "#fca5a5"
                 st.markdown(f"""
                 <div style="margin-bottom:16px;">
                   <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-                    <span style="font-family:Inter,sans-serif;font-size:12px;color:#64748b;">{row['Vis_Band']}</span>
-                    <span style="font-family:Inter,sans-serif;font-weight:700;font-size:12px;color:#0f172a;">{row['Min_Delay']:.1f} min</span>
+                    <span style="font-size:12px;color:#64748b;">{row['Vis_Band']}</span>
+                    <span style="font-weight:700;font-size:12px;color:#0f172a;">{row['Avg_Delay']:.1f} min</span>
                   </div>
                   <div style="background:#f1f5f9;border-radius:9999px;height:6px;overflow:hidden;">
                     <div style="background:{color};width:{pct}%;height:100%;border-radius:9999px;"></div>
@@ -361,13 +307,13 @@ elif "Weather Impact" in page:
     with c3:
         with st.container(border=True):
             card_title("Seasonal Delay Patterns")
-            seas = df_del.groupby("Season")["Min_Delay"].mean().reset_index()
-            seas["Season"] = pd.Categorical(seas["Season"],
+            seas_ord = seasonal.copy()
+            seas_ord["Season"] = pd.Categorical(seas_ord["Season"],
                 categories=["Winter","Spring","Summer","Fall"], ordered=True)
-            seas = seas.sort_values("Season")
-            fig_s = px.bar(seas, x="Season", y="Min_Delay",
-                color="Min_Delay", color_continuous_scale=[[0,"#fef2f2"],[1,RED]],
-                labels={"Min_Delay":"Avg Delay (min)"})
+            seas_ord = seas_ord.sort_values("Season")
+            fig_s = px.bar(seas_ord, x="Season", y="Avg_Delay",
+                color="Avg_Delay", color_continuous_scale=[[0,"#fef2f2"],[1,RED]],
+                labels={"Avg_Delay":"Avg Delay (min)"})
             fig_s = plotly_defaults(fig_s, 260)
             fig_s.update_layout(showlegend=False, coloraxis_showscale=False,
                 xaxis=dict(showgrid=False),
@@ -377,11 +323,8 @@ elif "Weather Impact" in page:
     with c4:
         with st.container(border=True):
             card_title("Wind Speed vs Severe Rate")
-            dw2 = df_del.dropna(subset=["Wind_Spd_kmh"]).copy()
-            dw2["Wind_Band"] = pd.cut(dw2["Wind_Spd_kmh"],
-                bins=[0,10,20,30,50,150], labels=["0–10","10–20","20–30","30–50","50+"])
-            wa = dw2.groupby("Wind_Band", observed=True)["Is_Severe"].mean().reset_index()
-            fig_w = px.line(wa, x="Wind_Band", y=(wa["Is_Severe"]*100).round(1),
+            fig_w = px.line(wind_agg, x="Wind_Band",
+                y=(wind_agg["Severe_Rate"]*100).round(1),
                 markers=True, color_discrete_sequence=[RED],
                 labels={"y":"Severe Rate %","Wind_Band":"Wind Speed (km/h)"})
             fig_w.update_traces(line=dict(width=2.5), marker=dict(size=7))
@@ -399,17 +342,8 @@ elif "Incident Analysis" in page:
 
     section_header("Situational Intelligence", "Incident Analysis")
 
-    inc = (
-        df_del.dropna(subset=["Incident_Category"])
-        .groupby("Incident_Category")
-        .agg(Total=("Min_Delay","count"), Avg_Delay=("Min_Delay","mean"),
-             Severe_Rate=("Is_Severe","mean"), Total_Hrs=("Min_Delay", lambda x: x.sum()/60))
-        .round(2).sort_values("Total", ascending=False).reset_index()
-    )
-    inc["Share"] = (inc["Total"] / inc["Total"].sum() * 100).round(1)
-    top_inc      = inc.iloc[0]
-
-    c1, c2 = st.columns(2)
+    top_inc = inc.iloc[0]
+    c1, c2  = st.columns(2)
     with c1:
         st.markdown(f"""
         <div class="callout-critical">
@@ -423,8 +357,8 @@ elif "Incident Analysis" in page:
             Avg: <b>{top_inc['Avg_Delay']:.1f} min</b> · Severe rate: <b>{top_inc['Severe_Rate']*100:.0f}%</b>.
           </div>
           <br>
-          <div style="font-size:13px;color:rgba(147,0,10,0.7);font-family:Inter,sans-serif;">
-            ⚡ Diversion (6.5% of volume) = <b>27.8%</b> of all delay hours — highest impact ratio.
+          <div style="font-size:13px;color:rgba(147,0,10,0.7);">
+            ⚡ Diversion (6.5% of volume) = <b>27.8%</b> of all delay hours.
           </div>
         </div>""", unsafe_allow_html=True)
 
@@ -450,9 +384,8 @@ elif "Incident Analysis" in page:
             "Total_Hrs":"Total Hours","Share":"Share %"})
         disp["Severe Rate"] = (disp["Severe Rate"]*100).round(1).astype(str) + "%"
         disp["Total Hours"] = disp["Total Hours"].round(0).astype(int)
-        st.dataframe(
-            disp[["Category","Incidents","Avg Delay (min)","Severe Rate","Total Hours","Share %"]],
-            use_container_width=True, hide_index=True)
+        st.dataframe(disp[["Category","Incidents","Avg Delay (min)","Severe Rate","Total Hours","Share %"]],
+                     use_container_width=True, hide_index=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -463,7 +396,7 @@ elif "Predictive Routing" in page:
     section_header("Future Operations", "Predictive Routing")
 
     if bundle is None:
-        st.error(f"Model not found at `{MODEL_PATH}`. Run `train_model_v4.py` first.")
+        st.error("Model bundle not found. Ensure `models/lgbm_ttc_regressor_bundle.pkl` is present.")
         st.stop()
 
     clf             = bundle["model"]
@@ -474,9 +407,6 @@ elif "Predictive Routing" in page:
     global_div      = bundle["global_div"]
     feature_columns = bundle["feature_columns"]
 
-    hw_path = os.path.join(ROOT, "data", "processed", "gtfs_headway_lookup.csv")
-    hw_df   = pd.read_csv(hw_path) if os.path.exists(hw_path) else None
-
     def get_season(m):
         return "Winter" if m in [12,1,2] else "Spring" if m in [3,4,5] else "Summer" if m in [6,7,8] else "Fall"
 
@@ -486,7 +416,6 @@ elif "Predictive Routing" in page:
         return float(m["Headway_min"].values[0]) if len(m) else 3.9
 
     c_in, c_out = st.columns([1, 2])
-
     with c_in:
         with st.container(border=True):
             card_title("Simulation Engine")
@@ -513,10 +442,9 @@ elif "Predictive Routing" in page:
                 rush    = 1 if hour in [7,8,9,16,17,18] else 0
                 weekend = 1 if day in ["Saturday","Sunday"] else 0
                 hw      = get_headway(float(route_num), hour)
-
-                r_avg  = route_encoding.get(route_num, global_avg)
-                i_avg  = incident_avg.get(incident_type, global_avg)
-                dv_avg = div_route.get(route_num, global_div)
+                r_avg   = route_encoding.get(route_num, global_avg)
+                i_avg   = incident_avg.get(incident_type, global_avg)
+                dv_avg  = div_route.get(route_num, global_div)
 
                 row = {col: 0 for col in feature_columns}
                 row.update({
@@ -535,51 +463,39 @@ elif "Predictive Routing" in page:
 
                 X    = np.array([row[col] for col in feature_columns]).reshape(1, -1)
                 pred = float(np.clip(np.expm1(clf.predict(X)[0]), 1, 300))
-
-                tier  = "Minor" if pred < 15 else "Moderate" if pred < 30 else "Severe"
+                tier   = "Minor" if pred < 15 else "Moderate" if pred < 30 else "Severe"
                 tcolor = "#16a34a" if pred < 15 else "#d97706" if pred < 30 else RED
 
-                r_hist = df_del[df_del["Route_Number"] == float(route_num)]
-                r_avg_hist = r_hist["Min_Delay"].mean() if len(r_hist) else global_avg
+                r_avg_hist = route_sum[route_sum["Route_Number"]==float(route_num)]["Avg_Delay"]
+                r_avg_hist = float(r_avg_hist.values[0]) if len(r_avg_hist) else global_avg
 
                 cr1, cr2 = st.columns(2)
                 with cr1:
                     st.markdown(f"""
                     <div style="background:#f8f9fa;border-radius:12px;padding:16px;margin-bottom:12px;">
-                      <div style="font-size:13px;color:#475569;font-family:Inter,sans-serif;">Predicted Delay</div>
-                      <div style="font-family:'Public Sans',sans-serif;font-weight:800;font-size:36px;color:{tcolor};">
-                        {pred:.0f} min
-                      </div>
+                      <div style="font-size:13px;color:#475569;">Predicted Delay</div>
+                      <div style="font-family:'Public Sans',sans-serif;font-weight:800;font-size:36px;color:{tcolor};">{pred:.0f} min</div>
                     </div>
                     <div style="background:#f8f9fa;border-radius:12px;padding:16px;margin-bottom:12px;">
-                      <div style="font-size:13px;color:#475569;font-family:Inter,sans-serif;">Severity</div>
+                      <div style="font-size:13px;color:#475569;">Severity</div>
                       <div style="font-family:'Public Sans',sans-serif;font-weight:700;font-size:22px;color:{tcolor};">
                         {'✅' if tier=='Minor' else '⚠️' if tier=='Moderate' else '🔴'} {tier}
                       </div>
                     </div>
                     <div style="background:#f8f9fa;border-radius:12px;padding:16px;">
-                      <div style="font-size:13px;color:#475569;font-family:Inter,sans-serif;">Route {route_num} Historical Avg</div>
-                      <div style="font-family:'Public Sans',sans-serif;font-weight:700;font-size:22px;color:#0f172a;">
-                        {r_avg_hist:.1f} min
-                      </div>
+                      <div style="font-size:13px;color:#475569;">Route {route_num} Hist. Avg</div>
+                      <div style="font-family:'Public Sans',sans-serif;font-weight:700;font-size:22px;color:#0f172a;">{r_avg_hist:.1f} min</div>
                     </div>""", unsafe_allow_html=True)
 
                 with cr2:
                     fig_g = go.Figure(go.Indicator(
-                        mode="gauge+number",
-                        value=min(pred, 60),
+                        mode="gauge+number", value=min(pred, 60),
                         number={"suffix":" min","font":{"family":"Public Sans","size":26,"color":tcolor}},
-                        gauge={
-                            "axis": {"range":[0,60],"tickfont":{"size":10,"color":"#94a3b8"}},
-                            "bar": {"color": tcolor},
-                            "bgcolor": "#f8f9fa",
-                            "steps": [
-                                {"range":[0,15],"color":"#dcfce7"},
-                                {"range":[15,30],"color":"#fef3c7"},
-                                {"range":[30,60],"color":"#fef2f2"},
-                            ],
-                        }
-                    ))
+                        gauge={"axis":{"range":[0,60],"tickfont":{"size":10,"color":"#94a3b8"}},
+                               "bar":{"color":tcolor},"bgcolor":"#f8f9fa",
+                               "steps":[{"range":[0,15],"color":"#dcfce7"},
+                                        {"range":[15,30],"color":"#fef3c7"},
+                                        {"range":[30,60],"color":"#fef2f2"}]}))
                     fig_g.update_layout(height=200, margin=dict(l=10,r=10,t=10,b=0),
                                         paper_bgcolor="white", font_family="Inter")
                     st.plotly_chart(fig_g, use_container_width=True)
@@ -588,13 +504,13 @@ elif "Predictive Routing" in page:
                 st.markdown(f"""
                 <div class="pred-result">
                   <div class="pred-label">Recommended Strategy</div>
-                  <div style="font-size:14px;color:#475569;font-family:Inter,sans-serif;line-height:1.6;">
+                  <div style="font-size:14px;color:#475569;line-height:1.6;">
                     Route <b style="color:#0f172a">{route_num}</b> predicted
-                    <b style="color:{tcolor}">{pred:.0f} min</b> behind schedule
-                    ({tier.lower()}) during <b style="color:#0f172a">{rush_str}</b>,
-                    {day}, {season}. Incident: <b style="color:#0f172a">{incident_type}</b>.
+                    <b style="color:{tcolor}">{pred:.0f} min</b> behind schedule ({tier.lower()})
+                    during <b style="color:#0f172a">{rush_str}</b>, {day}, {season}.
+                    Incident: <b style="color:#0f172a">{incident_type}</b>.
                     Headway: <b style="color:#0f172a">{hw:.1f} min</b>.
-                    {'⚡ Deploy replacement vehicle or notify passengers.' if pred >= 15 else '✅ Monitor — no immediate action required.'}
+                    {'⚡ Deploy replacement vehicle or notify passengers.' if pred >= 15 else '✅ No immediate action required.'}
                   </div>
                 </div>""", unsafe_allow_html=True)
             else:
@@ -602,8 +518,8 @@ elif "Predictive Routing" in page:
                 <div style="background:#f8fafc;border:2px dashed #e2e8f0;border-radius:16px;
                             padding:80px 40px;text-align:center;">
                   <div style="font-size:40px;margin-bottom:16px;">🔮</div>
-                  <div style="font-family:Inter,sans-serif;font-weight:700;font-size:11px;
-                              letter-spacing:1px;text-transform:uppercase;color:#94a3b8;">
+                  <div style="font-weight:700;font-size:11px;letter-spacing:1px;
+                              text-transform:uppercase;color:#94a3b8;">
                     Configure inputs and click Run Prediction
                   </div>
                 </div>""", unsafe_allow_html=True)
@@ -616,28 +532,15 @@ elif "Vehicle Intel" in page:
 
     section_header("Fleet Analytics", "Vehicle Intel")
 
-    mech = df_del[
-        (df_del["Incident_Category"] == "Mechanical") &
-        (df_del["Vehicle"].notna()) &
-        (df_del["Vehicle"].astype(str) != "0.0")
-    ].copy()
+    total_vehicles = int(vi["Total_Vehicles"].iloc[0]) if "Total_Vehicles" in vi.columns else len(vi)
+    worst_v        = vi.iloc[0]
+    high_sv        = vi[vi["Severe_Rate"] >= 0.35]
 
-    vi = (
-        mech.groupby("Vehicle")
-        .agg(Incidents=("Min_Delay","count"), Avg_Delay=("Min_Delay","mean"),
-             Total_Hrs=("Min_Delay", lambda x: x.sum()/60),
-             Severe_Rate=("Is_Severe","mean"))
-        .round(2).sort_values("Incidents", ascending=False).reset_index().head(30)
-    )
-
-    # KPIs
     k1, k2, k3 = st.columns(3)
-    worst_v = vi.iloc[0]
-    high_sv = vi[vi["Severe_Rate"] >= 0.35]
     with k1:
         st.markdown(f"""<div class="ttc-card">
           <div class="kpi-label">Vehicles Tracked</div>
-          <div class="kpi-value-dark">{mech['Vehicle'].nunique():,}</div>
+          <div class="kpi-value-dark">{total_vehicles:,}</div>
           <div class="kpi-change-down">with mechanical incidents</div>
         </div>""", unsafe_allow_html=True)
     with k2:
@@ -655,38 +558,30 @@ elif "Vehicle Intel" in page:
 
     st.markdown("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns([3, 2])
-
     with c1:
         with st.container(border=True):
             card_title("Top 30 Vehicles by Mechanical Incidents")
             vi_sorted = vi.sort_values("Incidents")
             vi_sorted["Vehicle_Label"] = "Bus " + vi_sorted["Vehicle"].astype(int).astype(str)
-            fig_v = px.bar(
-                vi_sorted,
-                x="Incidents",
-                y="Vehicle_Label",
-                orientation="h",
+            fig_v = px.bar(vi_sorted, x="Incidents", y="Vehicle_Label", orientation="h",
                 color="Severe_Rate",
                 color_continuous_scale=[[0,"#fef2f2"],[0.3,"#fca5a5"],[0.7,RED],[1,RED_DARK]],
                 custom_data=["Avg_Delay","Total_Hrs"],
-                labels={"Incidents":"Mechanical Incidents","Vehicle_Label":"Vehicle"},
-            )
+                labels={"Incidents":"Mechanical Incidents","Vehicle_Label":"Vehicle"})
             fig_v = plotly_defaults(fig_v, 600)
             fig_v.update_layout(
                 coloraxis_colorbar=dict(title="Severe Rate", tickformat=".0%"),
                 xaxis=dict(showgrid=True, gridcolor="#f1f5f9"),
-                yaxis=dict(showgrid=False, tickfont=dict(size=10), categoryorder="total ascending"),
-            )
+                yaxis=dict(showgrid=False, tickfont=dict(size=10), categoryorder="total ascending"))
             fig_v.update_traces(
-                hovertemplate="<b>%{y}</b><br>Incidents: %{x}<br>Avg Delay: %{customdata[0]:.1f} min<extra></extra>"
-            )
+                hovertemplate="<b>%{y}</b><br>Incidents: %{x}<br>Avg Delay: %{customdata[0]:.1f} min<extra></extra>")
             st.plotly_chart(fig_v, use_container_width=True)
+
     with c2:
         with st.container(border=True):
             card_title("Fleet Replacement Priority")
             st.caption("Ranked by Severe Rate × Incidents")
-            priority = vi.sort_values(
-                by=["Severe_Rate","Incidents"], ascending=False).head(15)
+            priority = vi.sort_values(by=["Severe_Rate","Incidents"], ascending=False).head(15)
             for i, (_, row) in enumerate(priority.iterrows(), 1):
                 sev_pct = int(row["Severe_Rate"] * 100)
                 color   = RED if sev_pct >= 35 else ("#d97706" if sev_pct >= 20 else "#94a3b8")
@@ -700,9 +595,7 @@ elif "Vehicle Intel" in page:
                     </div>
                   </div>
                   <div style="text-align:right;">
-                    <div style="font-family:Inter,sans-serif;font-weight:700;font-size:14px;color:{color};">
-                      {sev_pct}% severe
-                    </div>
+                    <div style="font-weight:700;font-size:14px;color:{color};">{sev_pct}% severe</div>
                     <div class="lb-sub">{row['Avg_Delay']:.1f} min avg</div>
                   </div>
                 </div>""", unsafe_allow_html=True)
