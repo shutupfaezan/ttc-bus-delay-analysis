@@ -20,7 +20,7 @@ MODEL_PATH = os.path.join(APP_DIR, "models", "lgbm_ttc_regressor_bundle.pkl")
 
 RED, RED_DARK, RED_MID, NAVY = "#b50303", "#93000a", "#dc2626", "#0f172a"
 
-POWERBI_URL = "https://app.powerbi.com/view?r=eyJrIjoiOTYyMmU5MGMtYjdkNC00Nzk3LTlkYzUtMGYwZTg5YjAxZGM5IiwidCI6ImE2YTU1ODM4LTk1ZWEtNGQ2Zi1iMTc4LWRmOTljZGRiODc4NiJ9"
+POWERBI_URL = "https://app.powerbi.com/view?r=eyJrIjoiNDI0YWQ5MzEtMzFmMi00OGJjLTllNmEtZGFmNTE5MjQ0Nzk5IiwidCI6ImE2YTU1ODM4LTk1ZWEtNGQ2Zi1iMTc4LWRmOTljZGRiODc4NiJ9"
 
 st.set_page_config(page_title="TTC Analytics", page_icon="🚌",
     layout="wide", initial_sidebar_state="expanded")
