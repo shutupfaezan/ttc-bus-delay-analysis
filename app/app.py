@@ -1,6 +1,6 @@
 """
 app.py — TTC Bus Delay Analytics Dashboard (Local Version)
-Reads from master_ttc_eda_master.csv
+Structured into Descriptive / Diagnostic / Predictive / Prescriptive analytics.
 Run with: python -m streamlit run app.py  (from app/ folder)
 """
 import os
@@ -20,28 +20,18 @@ DATA_PATH  = os.path.join(ROOT, "data", "processed", "master_ttc_eda_master.csv"
 MODEL_PATH = os.path.join(ROOT, "models", "lgbm_ttc_regressor_bundle.pkl")
 HW_PATH    = os.path.join(ROOT, "data", "processed", "gtfs_headway_lookup.csv")
 
-# ── Design tokens ──────────────────────────────────────────────────────────────
-RED      = "#b50303"
-RED_DARK = "#93000a"
-RED_MID  = "#dc2626"
-NAVY     = "#0f172a"
+RED, RED_DARK, RED_MID, NAVY = "#b50303", "#93000a", "#dc2626", "#0f172a"
 
 POWERBI_URL = "https://app.powerbi.com/view?r=eyJrIjoiOTYyMmU5MGMtYjdkNC00Nzk3LTlkYzUtMGYwZTg5YjAxZGM5IiwidCI6ImE2YTU1ODM4LTk1ZWEtNGQ2Zi1iMTc4LWRmOTljZGRiODc4NiJ9"
 
-# ── Page config ────────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="TTC Analytics",
-    page_icon="🚌",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+st.set_page_config(page_title="TTC Analytics", page_icon="🚌",
+    layout="wide", initial_sidebar_state="expanded")
 
-# ── Inject CSS ────────────────────────────────────────────────────────────────
 _css_path = os.path.join(APP_DIR, "style.css")
 with open(_css_path) as _f:
     st.html(f"<style>{_f.read()}</style>")
 
-# ── Data loading ──────────────────────────────────────────────────────────────
+# ── Data ──────────────────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
     df = pd.read_csv(DATA_PATH, low_memory=False)
@@ -50,72 +40,64 @@ def load_data():
 
 @st.cache_resource
 def load_model():
-    if not os.path.exists(MODEL_PATH):
-        return None
-    with open(MODEL_PATH, "rb") as f:
-        return pickle.load(f)
+    if not os.path.exists(MODEL_PATH): return None
+    with open(MODEL_PATH, "rb") as f: return pickle.load(f)
 
 df     = load_data()
 df_del = df[df["Min_Delay"] > 0].copy()
 bundle = load_model()
 hw_df  = pd.read_csv(HW_PATH) if os.path.exists(HW_PATH) else None
 
-# ── Pre-compute aggregations ───────────────────────────────────────────────────
 @st.cache_data
-def compute_aggs(_df_del):
-    ly  = _df_del[_df_del["Year"] == _df_del["Year"].max()]
-    py  = _df_del[_df_del["Year"] == _df_del["Year"].max() - 1]
+def compute_aggs(_df):
+    ly  = _df[_df["Year"] == _df["Year"].max()]
+    py  = _df[_df["Year"] == _df["Year"].max() - 1]
     kpi = {
-        "total":        len(_df_del),
-        "avg_delay":    round(_df_del["Min_Delay"].mean(), 2),
-        "severe_rate":  round(_df_del["Is_Severe"].mean() * 100, 1),
-        "sev30_rate":   round(_df_del["Is_Severe_30"].mean() * 100, 1),
-        "yoy_n":        round((len(ly)-len(py))/len(py)*100, 1) if len(py) else 0,
-        "yoy_d":        round(ly["Min_Delay"].mean() - py["Min_Delay"].mean(), 2),
+        "total": len(_df), "avg_delay": round(_df["Min_Delay"].mean(), 2),
+        "severe_rate": round(_df["Is_Severe"].mean()*100, 1),
+        "sev30_rate": round(_df["Is_Severe_30"].mean()*100, 1),
+        "yoy_n": round((len(ly)-len(py))/len(py)*100, 1) if len(py) else 0,
+        "yoy_d": round(ly["Min_Delay"].mean() - py["Min_Delay"].mean(), 2),
     }
-    yoy = _df_del.groupby("Year").agg(
-        Incidents=("Min_Delay","count"), Avg_Delay=("Min_Delay","mean"),
-        Severe_Rate=("Is_Severe","mean")).round(3).reset_index()
-    monthly = _df_del.groupby("Month").agg(
+    yoy = _df.groupby("Year").agg(Incidents=("Min_Delay","count"),
         Avg_Delay=("Min_Delay","mean"), Severe_Rate=("Is_Severe","mean")).round(3).reset_index()
-    monthly["Month_Name"] = monthly["Month"].map({
-        1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",
+    monthly = _df.groupby("Month").agg(
+        Avg_Delay=("Min_Delay","mean"), Severe_Rate=("Is_Severe","mean")).round(3).reset_index()
+    monthly["Month_Name"] = monthly["Month"].map({1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",
         7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"})
-    route = (_df_del.groupby("Route_Number").agg(
-        Incidents=("Min_Delay","count"), Avg_Delay=("Min_Delay","mean"),
-        Severe_Rate=("Is_Severe","mean"), Avg_Headway=("Headway_min","mean"))
-        .round(3).query("Incidents >= 100").reset_index())
+    route = (_df.groupby("Route_Number").agg(Incidents=("Min_Delay","count"),
+        Avg_Delay=("Min_Delay","mean"), Severe_Rate=("Is_Severe","mean"),
+        Avg_Headway=("Headway_min","mean")).round(3).query("Incidents >= 100").reset_index())
     route["Risk_Score"] = (route["Avg_Delay"]*route["Avg_Headway"]*route["Severe_Rate"]).round(2)
-    inc = (_df_del.dropna(subset=["Incident_Category"]).groupby("Incident_Category").agg(
+    inc = (_df.dropna(subset=["Incident_Category"]).groupby("Incident_Category").agg(
         Total=("Min_Delay","count"), Avg_Delay=("Min_Delay","mean"),
         Severe_Rate=("Is_Severe","mean"), Total_Hrs=("Min_Delay", lambda x: x.sum()/60))
         .round(2).sort_values("Total", ascending=False).reset_index())
     inc["Share"] = (inc["Total"]/inc["Total"].sum()*100).round(1)
-    mech = _df_del[(_df_del["Incident_Category"]=="Mechanical") &
-                   (_df_del["Vehicle"].notna()) &
-                   (_df_del["Vehicle"].astype(str)!="0.0")].copy()
-    vi = (mech.groupby("Vehicle").agg(
-        Incidents=("Min_Delay","count"), Avg_Delay=("Min_Delay","mean"),
-        Total_Hrs=("Min_Delay", lambda x: x.sum()/60), Severe_Rate=("Is_Severe","mean"))
-        .round(2).sort_values("Incidents", ascending=False).reset_index().head(30))
+    mech = _df[(_df["Incident_Category"]=="Mechanical") & (_df["Vehicle"].notna()) &
+               (_df["Vehicle"].astype(str)!="0.0")].copy()
+    vi = (mech.groupby("Vehicle").agg(Incidents=("Min_Delay","count"),
+        Avg_Delay=("Min_Delay","mean"), Total_Hrs=("Min_Delay", lambda x: x.sum()/60),
+        Severe_Rate=("Is_Severe","mean")).round(2).sort_values("Incidents", ascending=False)
+        .reset_index().head(30))
     vi["Total_Vehicles"] = mech["Vehicle"].nunique()
-    dw = _df_del.dropna(subset=["Temp_C"]).copy()
+    dw = _df.dropna(subset=["Temp_C"]).copy()
     dw["Temp_Band"] = pd.cut(dw["Temp_C"], bins=[-35,-15,0,5,15,25,45],
         labels=["Extreme Cold\n(<-15°C)","Cold\n(-15–0°C)","Cool\n(0–5°C)",
                 "Mild\n(5–15°C)","Warm\n(15–25°C)","Hot\n(25°C+)"])
     temp_agg = dw.groupby("Temp_Band", observed=True).agg(
-        Avg_Delay=("Min_Delay","mean"), Severe_Rate=("Is_Severe","mean")).round(3).reset_index()
-    dv = _df_del.dropna(subset=["Visibility_km"]).copy()
+        Avg_Delay=("Min_Delay","mean")).round(3).reset_index()
+    dv = _df.dropna(subset=["Visibility_km"]).copy()
     dv["Vis_Band"] = pd.cut(dv["Visibility_km"], bins=[0,1,5,15,100],
         labels=["<1km","1–5km","5–15km","15km+"])
     vis_agg = dv.groupby("Vis_Band", observed=True).agg(
         Avg_Delay=("Min_Delay","mean")).round(3).reset_index()
-    dw2 = _df_del.dropna(subset=["Wind_Spd_kmh"]).copy()
+    dw2 = _df.dropna(subset=["Wind_Spd_kmh"]).copy()
     dw2["Wind_Band"] = pd.cut(dw2["Wind_Spd_kmh"], bins=[0,10,20,30,50,150],
         labels=["0–10","10–20","20–30","30–50","50+"])
     wind_agg = dw2.groupby("Wind_Band", observed=True).agg(
         Severe_Rate=("Is_Severe","mean")).round(3).reset_index()
-    seasonal = _df_del.groupby("Season").agg(
+    seasonal = _df.groupby("Season").agg(
         Avg_Delay=("Min_Delay","mean"), Severe_Rate=("Is_Severe","mean")).round(3).reset_index()
     return kpi, yoy, monthly, route, inc, vi, temp_agg, vis_agg, wind_agg, seasonal
 
@@ -125,19 +107,15 @@ kpi, yoy, monthly, route_sum, inc, vi, temp_agg, vis_agg, wind_agg, seasonal = c
 with st.sidebar:
     st.markdown('<p class="sidebar-brand">Transit Control</p>', unsafe_allow_html=True)
     st.markdown('<p class="sidebar-sub">Editorial Analytics</p>', unsafe_allow_html=True)
-    page = st.radio(
-        "Navigation",
-        label_visibility="collapsed",
+    page = st.radio("Navigation", label_visibility="collapsed",
         options=[
-            "🏠  Dashboard",
-            "🚌  Route Analysis",
-            "🌦  Weather Impact",
-            "⚠️  Incident Analysis",
-            "🔮  Predictive Routing",
-            "🔧  Vehicle Intel",
+            "🏠  Overview",
+            "📈  Descriptive",
+            "🔍  Diagnostic",
+            "🔮  Predictive",
+            "💡  Prescriptive",
             "📊  Power BI Report",
-        ],
-    )
+        ])
     st.divider()
     st.caption("Data: 2015–2025 · 644k incidents\nModel: LightGBM v4")
 
@@ -149,54 +127,97 @@ def section_header(eyebrow, heading):
 def card_title(text):
     st.markdown(f'<p class="card-heading">{text}</p>', unsafe_allow_html=True)
 
+def subsection(text):
+    st.markdown(f'<p style="font-family:\'Public Sans\',sans-serif;font-weight:700;font-size:22px;color:#191c1d;margin:32px 0 16px 0;letter-spacing:-0.4px;">{text}</p>', unsafe_allow_html=True)
+
 def plotly_defaults(fig, height=300):
     fig.update_layout(plot_bgcolor="white", paper_bgcolor="white",
         font_family="Inter", margin=dict(l=0,r=0,t=8,b=0), height=height)
     return fig
 
+def kpi_card_red(label, value, sub):
+    st.markdown(f"""<div class="ttc-card">
+      <div class="kpi-label">{label}</div>
+      <div class="kpi-value-red">{value}</div>
+      <div class="kpi-change-down">{sub}</div></div>""", unsafe_allow_html=True)
+
+def kpi_card_dark(label, value, unit, sub, sub_up=False):
+    sub_cls = "kpi-change-up" if sub_up else "kpi-change-down"
+    st.markdown(f"""<div class="ttc-card">
+      <div class="kpi-label">{label}</div>
+      <span class="kpi-value-dark">{value}</span>
+      <span class="kpi-unit"> {unit}</span>
+      <div class="{sub_cls}">{sub}</div></div>""", unsafe_allow_html=True)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PAGE 1 — DASHBOARD
+# PAGE 1 — 🏠 OVERVIEW
 # ═══════════════════════════════════════════════════════════════════════════════
-if "Dashboard" in page:
+if "Overview" in page:
     col_h, col_b = st.columns([3, 1])
     with col_h:
-        section_header("Real-Time Performance", "System Overview")
+        section_header("Transit Analytics", "TTC Bus Delay Intelligence")
     with col_b:
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown('<span class="badge-live">● SYSTEM LIVE</span>', unsafe_allow_html=True)
 
+    st.markdown("""
+    <div style="font-family:Inter,sans-serif;font-size:15px;color:#475569;line-height:1.7;max-width:900px;">
+      This dashboard analyzes <b>644,819 TTC bus delay incidents</b> from 2015–2025
+      alongside weather data and GTFS headway schedules. Navigate through the four
+      analytics lenses in the sidebar to explore what happened, why, what will happen, and what to do.
+    </div>""", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
     k1, k2, k3, k4 = st.columns(4)
     with k1:
-        st.markdown(f"""<div class="ttc-card">
-          <div class="kpi-label">Total Incidents</div>
-          <div class="kpi-value-red">{int(kpi['total']):,}</div>
-          <div class="kpi-change-{'up' if kpi['yoy_n'] < 0 else 'down'}">
-            {'↓' if kpi['yoy_n'] < 0 else '↑'} {abs(kpi['yoy_n']):.1f}% vs prior year
-          </div></div>""", unsafe_allow_html=True)
+        sign = '↓' if kpi['yoy_n'] < 0 else '↑'
+        kpi_card_red("Total Incidents", f"{int(kpi['total']):,}",
+            f"{sign} {abs(kpi['yoy_n']):.1f}% vs prior year")
     with k2:
-        st.markdown(f"""<div class="ttc-card">
-          <div class="kpi-label">Avg Delay Duration</div>
-          <span class="kpi-value-dark">{kpi['avg_delay']:.0f}</span>
-          <span class="kpi-unit"> min</span>
-          <div class="kpi-change-down">↑ {abs(kpi['yoy_d']):.1f} min vs prior year</div>
-        </div>""", unsafe_allow_html=True)
+        kpi_card_dark("Avg Delay Duration", f"{kpi['avg_delay']:.0f}", "min",
+            f"↑ {abs(kpi['yoy_d']):.1f} min vs prior year")
     with k3:
-        st.markdown(f"""<div class="ttc-card">
-          <div class="kpi-label">Severe Rate (≥15 min)</div>
-          <span class="kpi-value-dark">{kpi['severe_rate']:.0f}</span>
-          <span class="kpi-unit"> %</span>
-          <div class="kpi-change-down">of all delays are severe</div>
-        </div>""", unsafe_allow_html=True)
+        kpi_card_dark("Severe Rate (≥15 min)", f"{kpi['severe_rate']:.0f}", "%",
+            "of all delays are severe")
     with k4:
-        st.markdown(f"""<div class="ttc-card">
-          <div class="kpi-label">Critical Rate (≥30 min)</div>
-          <span class="kpi-value-dark">{kpi['sev30_rate']:.0f}</span>
-          <span class="kpi-unit"> %</span>
-          <div class="kpi-change-down">require urgent response</div>
-        </div>""", unsafe_allow_html=True)
+        kpi_card_dark("Critical Rate (≥30 min)", f"{kpi['sev30_rate']:.0f}", "%",
+            "require urgent response")
 
     st.markdown("<br>", unsafe_allow_html=True)
+
+    g1, g2, g3, g4 = st.columns(4)
+    with g1:
+        with st.container(border=True):
+            st.markdown('<p style="font-weight:700;color:#b50303;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin:0 0 8px 0;">📈 Descriptive</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-family:\'Public Sans\',sans-serif;font-weight:700;font-size:16px;color:#0f172a;margin:0 0 8px 0;">What happened?</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:13px;color:#64748b;line-height:1.5;">Historical trends, route performance, vehicle incidents, and incident breakdowns.</p>', unsafe_allow_html=True)
+    with g2:
+        with st.container(border=True):
+            st.markdown('<p style="font-weight:700;color:#b50303;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin:0 0 8px 0;">🔍 Diagnostic</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-family:\'Public Sans\',sans-serif;font-weight:700;font-size:16px;color:#0f172a;margin:0 0 8px 0;">Why did it happen?</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:13px;color:#64748b;line-height:1.5;">Weather correlations, route risk factors, and root-cause callouts.</p>', unsafe_allow_html=True)
+    with g3:
+        with st.container(border=True):
+            st.markdown('<p style="font-weight:700;color:#b50303;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin:0 0 8px 0;">🔮 Predictive</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-family:\'Public Sans\',sans-serif;font-weight:700;font-size:16px;color:#0f172a;margin:0 0 8px 0;">What will happen?</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:13px;color:#64748b;line-height:1.5;">LightGBM ML model forecasting delay minutes given route, time, and conditions.</p>', unsafe_allow_html=True)
+    with g4:
+        with st.container(border=True):
+            st.markdown('<p style="font-weight:700;color:#b50303;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin:0 0 8px 0;">💡 Prescriptive</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-family:\'Public Sans\',sans-serif;font-weight:700;font-size:16px;color:#0f172a;margin:0 0 8px 0;">What should we do?</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:13px;color:#64748b;line-height:1.5;">Fleet replacement priorities, route interventions, and strategic recommendations.</p>', unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PAGE 2 — 📈 DESCRIPTIVE
+# ═══════════════════════════════════════════════════════════════════════════════
+elif "Descriptive" in page:
+    section_header("Historical Performance", "Descriptive Analytics")
+    st.caption("What happened? Trends, patterns, and historical summaries from 10 years of TTC bus delay data.")
+
+    # ── 1. Trends Over Time ───────────────────────────────────────────────────
+    subsection("1. Trends Over Time")
     c1, c2 = st.columns([2, 1])
     with c1:
         with st.container(border=True):
@@ -221,89 +242,162 @@ if "Dashboard" in page:
                 yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(color="#94a3b8",size=11), ticksuffix="%"))
             st.plotly_chart(fig2, use_container_width=True)
 
+    # ── 2. Seasonal & Monthly Patterns ────────────────────────────────────────
+    subsection("2. Seasonal & Monthly Patterns")
+    c3, c4 = st.columns([2, 1])
+    with c3:
+        with st.container(border=True):
+            card_title("Monthly Delay Patterns (avg across all years)")
+            fig3 = go.Figure()
+            fig3.add_bar(x=monthly["Month_Name"], y=monthly["Avg_Delay"].round(1),
+                         name="Avg Delay (min)", marker_color=RED, opacity=0.85)
+            fig3.add_scatter(x=monthly["Month_Name"], y=(monthly["Severe_Rate"]*100).round(1),
+                             name="Severe Rate %", mode="lines+markers",
+                             line=dict(color=NAVY,width=2), marker=dict(size=5), yaxis="y2")
+            fig3 = plotly_defaults(fig3, 270)
+            fig3.update_layout(
+                legend=dict(orientation="h",y=1.1,font=dict(size=11,color="#64748b")),
+                xaxis=dict(showgrid=False, tickfont=dict(color="#94a3b8",size=11)),
+                yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(color="#94a3b8",size=11)),
+                yaxis2=dict(overlaying="y", side="right", tickfont=dict(color="#94a3b8",size=11),
+                            ticksuffix="%", showgrid=False))
+            st.plotly_chart(fig3, use_container_width=True)
+    with c4:
+        with st.container(border=True):
+            card_title("Seasonal Delay")
+            seas = seasonal.copy()
+            seas["Season"] = pd.Categorical(seas["Season"],
+                categories=["Winter","Spring","Summer","Fall"], ordered=True)
+            seas = seas.sort_values("Season")
+            fig_s = px.bar(seas, x="Season", y="Avg_Delay",
+                color="Avg_Delay", color_continuous_scale=[[0,"#fef2f2"],[1,RED]],
+                labels={"Avg_Delay":"Avg Delay (min)"})
+            fig_s = plotly_defaults(fig_s, 270)
+            fig_s.update_layout(showlegend=False, coloraxis_showscale=False,
+                xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor="#f1f5f9"))
+            st.plotly_chart(fig_s, use_container_width=True)
+
+    # ── 3. Route Performance ──────────────────────────────────────────────────
+    subsection("3. Route Performance")
+    with st.container(border=True):
+        card_title("Route Efficiency Leaderboard — Top 15 by Incidents")
+        top15  = route_sum.sort_values("Incidents", ascending=False).head(15)
+        max_d  = top15["Avg_Delay"].max()
+        colors = [RED, RED, RED_MID, RED_MID] + ["#f87171"]*11
+        for i, (_, row) in enumerate(top15.iterrows(), 1):
+            pct = int(row["Avg_Delay"]/max_d*100)
+            st.markdown(f"""<div class="lb-row">
+              <div style="display:flex;align-items:center;gap:16px;flex:1;">
+                <span class="lb-rank">{i:02d}</span>
+                <div><div class="lb-route">Route {int(row['Route_Number'])}</div>
+                <div class="lb-sub">{int(row['Incidents']):,} incidents</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:24px;">
+                <div style="text-align:right;">
+                  <div class="lb-delay">{row['Avg_Delay']:.1f}m</div>
+                  <div class="lb-sub">avg delay</div></div>
+                <div style="background:#f1f5f9;border-radius:9999px;width:120px;height:6px;overflow:hidden;">
+                  <div style="background:{colors[i-1]};width:{pct}%;height:100%;border-radius:9999px;"></div>
+                </div></div></div>""", unsafe_allow_html=True)
+
+    # ── 4. Incident Breakdown ─────────────────────────────────────────────────
+    subsection("4. Incident Breakdown")
+    c5, c6 = st.columns([1, 1])
+    with c5:
+        with st.container(border=True):
+            card_title("Root Cause Distribution")
+            fig_tree = px.treemap(inc, path=["Incident_Category"], values="Total",
+                color="Avg_Delay",
+                color_continuous_scale=[[0,"#fef2f2"],[0.3,"#fca5a5"],[0.7,RED],[1,RED_DARK]],
+                custom_data=["Avg_Delay","Share","Severe_Rate"])
+            fig_tree.update_traces(
+                texttemplate="<b>%{label}</b><br>%{customdata[1]:.1f}%",
+                hovertemplate="<b>%{label}</b><br>Count: %{value:,}<br>Avg Delay: %{customdata[0]:.1f} min<br>Severe: %{customdata[2]:.1%}<extra></extra>",
+                textfont=dict(family="Inter",size=12))
+            fig_tree.update_layout(margin=dict(l=0,r=0,t=0,b=0), height=320)
+            st.plotly_chart(fig_tree, use_container_width=True)
+    with c6:
+        with st.container(border=True):
+            card_title("Incident Category Breakdown")
+            disp = inc.rename(columns={"Incident_Category":"Category","Total":"Incidents",
+                "Avg_Delay":"Avg Delay","Severe_Rate":"Severe","Total_Hrs":"Hours","Share":"Share"})
+            disp["Severe"] = (disp["Severe"]*100).round(1).astype(str)+"%"
+            disp["Hours"]  = disp["Hours"].round(0).astype(int)
+            disp["Share"]  = disp["Share"].astype(str)+"%"
+            st.dataframe(disp[["Category","Incidents","Avg Delay","Severe","Hours","Share"]],
+                         use_container_width=True, hide_index=True, height=320)
+
+    # ── 5. Vehicle Performance ────────────────────────────────────────────────
+    subsection("5. Vehicle Performance")
+    total_v = int(vi["Total_Vehicles"].iloc[0])
+    worst_v = vi.iloc[0]
+    k1, k2 = st.columns(2)
+    with k1:
+        kpi_card_dark("Vehicles Tracked", f"{total_v:,}", "", "with mechanical incidents")
+    with k2:
+        kpi_card_red("Worst Vehicle", f"{int(worst_v['Vehicle'])}",
+            f"{int(worst_v['Incidents'])} incidents · {worst_v['Avg_Delay']:.1f} min avg")
+
     st.markdown("<br>", unsafe_allow_html=True)
     with st.container(border=True):
-        card_title("Monthly Delay Patterns (avg across all years)")
-        fig3 = go.Figure()
-        fig3.add_bar(x=monthly["Month_Name"], y=monthly["Avg_Delay"].round(1),
-                     name="Avg Delay (min)", marker_color=RED, opacity=0.85)
-        fig3.add_scatter(x=monthly["Month_Name"], y=(monthly["Severe_Rate"]*100).round(1),
-                         name="Severe Rate %", mode="lines+markers",
-                         line=dict(color=NAVY,width=2), marker=dict(size=5), yaxis="y2")
-        fig3 = plotly_defaults(fig3, 270)
-        fig3.update_layout(
-            legend=dict(orientation="h",y=1.1,font=dict(size=11,color="#64748b")),
-            xaxis=dict(showgrid=False, tickfont=dict(color="#94a3b8",size=11)),
-            yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(color="#94a3b8",size=11)),
-            yaxis2=dict(overlaying="y", side="right", tickfont=dict(color="#94a3b8",size=11),
-                        ticksuffix="%", showgrid=False))
-        st.plotly_chart(fig3, use_container_width=True)
+        card_title("Top 30 Vehicles by Mechanical Incidents")
+        vi_s = vi.sort_values("Incidents")
+        vi_s["Vehicle_Label"] = "Bus " + vi_s["Vehicle"].astype(int).astype(str)
+        fig_v = px.bar(vi_s, x="Incidents", y="Vehicle_Label", orientation="h",
+            color="Severe_Rate",
+            color_continuous_scale=[[0,"#fef2f2"],[0.3,"#fca5a5"],[0.7,RED],[1,RED_DARK]],
+            custom_data=["Avg_Delay","Total_Hrs"],
+            labels={"Incidents":"Mechanical Incidents","Vehicle_Label":"Vehicle"})
+        fig_v = plotly_defaults(fig_v, 600)
+        fig_v.update_layout(
+            coloraxis_colorbar=dict(title="Severe Rate", tickformat=".0%"),
+            xaxis=dict(showgrid=True, gridcolor="#f1f5f9"),
+            yaxis=dict(showgrid=False, tickfont=dict(size=10), categoryorder="total ascending"))
+        fig_v.update_traces(hovertemplate="<b>%{y}</b><br>Incidents: %{x}<br>Avg Delay: %{customdata[0]:.1f} min<extra></extra>")
+        st.plotly_chart(fig_v, use_container_width=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PAGE 2 — ROUTE ANALYSIS
+# PAGE 3 — 🔍 DIAGNOSTIC
 # ═══════════════════════════════════════════════════════════════════════════════
-elif "Route Analysis" in page:
-    section_header("Operational Analytics", "Route Performance")
-    c1, c2 = st.columns([1, 2])
+elif "Diagnostic" in page:
+    section_header("Causal Analysis", "Diagnostic Analytics")
+    st.caption("Why did it happen? Correlations, risk factors, and root-cause drivers of bus delays.")
+
+    # ── 1. Critical Findings Callouts ─────────────────────────────────────────
+    subsection("1. Critical Findings")
+    top_inc = inc.iloc[0]
+    worst   = route_sum.sort_values("Incidents", ascending=False).iloc[0]
+    c1, c2 = st.columns(2)
     with c1:
-        worst = route_sum.sort_values("Incidents", ascending=False).iloc[0]
-        st.markdown(f"""<div class="ttc-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-            <div style="background:#f8f9fa;border-radius:12px;padding:12px;">🚌</div>
-            <span class="badge-critical">CRITICAL</span>
+        st.markdown(f"""<div class="callout-critical">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <span style="font-size:24px;">🚌</span>
+            <div class="callout-title">Worst Route: {int(worst['Route_Number'])}</div>
           </div>
-          <div style="font-family:'Public Sans',sans-serif;font-weight:700;font-size:20px;color:#191c1d;margin-bottom:4px;">
-            Route {int(worst['Route_Number'])}</div>
-          <div style="font-family:Inter,sans-serif;font-size:14px;color:#64748b;margin-bottom:20px;">
-            Highest frequency · avg {worst['Avg_Delay']:.1f} min delay</div>
-          <div style="border-top:1px solid #e2e8f0;padding-top:16px;display:flex;justify-content:space-between;">
-            <span style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">Total incidents</span>
-            <span style="font-weight:500;font-size:12px;color:#0f172a;">{int(worst['Incidents']):,}</span>
+          <div class="callout-body">
+            Route <b>{int(worst['Route_Number'])}</b> has the highest incident frequency with
+            <b>{int(worst['Incidents']):,}</b> recorded incidents — an average delay of
+            <b>{worst['Avg_Delay']:.1f} minutes</b> per event. Headway: <b>{worst['Avg_Headway']:.1f} min</b>.
           </div></div>""", unsafe_allow_html=True)
     with c2:
-        with st.container(border=True):
-            card_title("Route Efficiency Leaderboard — Top 15 by Incidents")
-            top15  = route_sum.sort_values("Incidents", ascending=False).head(15)
-            max_d  = top15["Avg_Delay"].max()
-            colors = [RED, RED, RED_MID, RED_MID] + ["#f87171"]*11
-            for i, (_, row) in enumerate(top15.iterrows(), 1):
-                pct = int(row["Avg_Delay"]/max_d*100)
-                st.markdown(f"""<div class="lb-row">
-                  <div style="display:flex;align-items:center;gap:16px;flex:1;">
-                    <span class="lb-rank">{i:02d}</span>
-                    <div><div class="lb-route">Route {int(row['Route_Number'])}</div>
-                    <div class="lb-sub">{int(row['Incidents']):,} incidents</div></div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:24px;">
-                    <div style="text-align:right;">
-                      <div class="lb-delay">{row['Avg_Delay']:.1f}m</div>
-                      <div class="lb-sub">avg delay</div></div>
-                    <div style="background:#f1f5f9;border-radius:9999px;width:120px;height:6px;overflow:hidden;">
-                      <div style="background:{colors[i-1]};width:{pct}%;height:100%;border-radius:9999px;"></div>
-                    </div></div></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div class="callout-critical">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <span style="font-size:24px;">⚠️</span>
+            <div class="callout-title">Top Incident: {top_inc['Incident_Category']}</div>
+          </div>
+          <div class="callout-body">
+            <b>{top_inc['Incident_Category']}</b> is <b>{top_inc['Share']:.0f}%</b> of incidents —
+            {int(top_inc['Total']):,} total producing <b>{int(top_inc['Total_Hrs']):,} hours</b> of delay.
+          </div><br>
+          <div style="font-size:13px;color:rgba(147,0,10,0.7);">
+            ⚡ Diversion (6.5% of volume) = <b>27.8%</b> of all delay hours — highest impact ratio.
+          </div></div>""", unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    with st.container(border=True):
-        card_title("Route Risk Profile — High Delay × Low Frequency")
-        st.caption("Risk Score = Avg Delay × Headway × Severe Rate.")
-        top_risk = route_sum.sort_values("Risk_Score", ascending=False).head(20)
-        fig_r = px.scatter(top_risk, x="Avg_Headway", y="Avg_Delay", size="Incidents",
-            color="Severe_Rate", color_continuous_scale=[[0,"#fef2f2"],[0.5,RED],[1,RED_DARK]],
-            hover_name="Route_Number",
-            labels={"Avg_Headway":"Headway (min)","Avg_Delay":"Avg Delay (min)","Severe_Rate":"Severe Rate"})
-        fig_r = plotly_defaults(fig_r, 380)
-        fig_r.update_traces(marker=dict(line=dict(width=1,color="white")))
-        st.plotly_chart(fig_r, use_container_width=True)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# PAGE 3 — WEATHER IMPACT
-# ═══════════════════════════════════════════════════════════════════════════════
-elif "Weather Impact" in page:
-    section_header("Environmental Correlation", "Weather Impact")
-    c1, c2 = st.columns([3, 1])
-    with c1:
+    # ── 2. Weather Correlations ───────────────────────────────────────────────
+    subsection("2. Weather Correlations")
+    c3, c4 = st.columns([3, 1])
+    with c3:
         with st.container(border=True):
             card_title("Temperature vs Avg Delay Duration")
             fig_t = go.Figure()
@@ -314,7 +408,7 @@ elif "Weather Impact" in page:
                 xaxis=dict(showgrid=False, tickfont=dict(color="#94a3b8",size=11)),
                 yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(color="#94a3b8",size=11)))
             st.plotly_chart(fig_t, use_container_width=True)
-    with c2:
+    with c4:
         with st.container(border=True):
             card_title("Visibility Impact")
             for _, row in vis_agg.iterrows():
@@ -330,87 +424,40 @@ elif "Weather Impact" in page:
                   </div></div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    c3, c4 = st.columns(2)
-    with c3:
-        with st.container(border=True):
-            card_title("Seasonal Delay Patterns")
-            seas = seasonal.copy()
-            seas["Season"] = pd.Categorical(seas["Season"],
-                categories=["Winter","Spring","Summer","Fall"], ordered=True)
-            seas = seas.sort_values("Season")
-            fig_s = px.bar(seas, x="Season", y="Avg_Delay",
-                color="Avg_Delay", color_continuous_scale=[[0,"#fef2f2"],[1,RED]],
-                labels={"Avg_Delay":"Avg Delay (min)"})
-            fig_s = plotly_defaults(fig_s, 260)
-            fig_s.update_layout(showlegend=False, coloraxis_showscale=False,
-                xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor="#f1f5f9"))
-            st.plotly_chart(fig_s, use_container_width=True)
-    with c4:
-        with st.container(border=True):
-            card_title("Wind Speed vs Severe Rate")
-            fig_w = px.line(wind_agg, x="Wind_Band", y=(wind_agg["Severe_Rate"]*100).round(1),
-                markers=True, color_discrete_sequence=[RED],
-                labels={"y":"Severe Rate %","Wind_Band":"Wind Speed (km/h)"})
-            fig_w.update_traces(line=dict(width=2.5), marker=dict(size=7))
-            fig_w = plotly_defaults(fig_w, 260)
-            fig_w.update_layout(showlegend=False,
-                xaxis=dict(showgrid=False),
-                yaxis=dict(showgrid=True, gridcolor="#f1f5f9", ticksuffix="%"))
-            st.plotly_chart(fig_w, use_container_width=True)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# PAGE 4 — INCIDENT ANALYSIS
-# ═══════════════════════════════════════════════════════════════════════════════
-elif "Incident Analysis" in page:
-    section_header("Situational Intelligence", "Incident Analysis")
-    top_inc = inc.iloc[0]
-    c1, c2  = st.columns(2)
-    with c1:
-        st.markdown(f"""<div class="callout-critical">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-            <span style="font-size:24px;">⚠️</span>
-            <div class="callout-title">Top Incident:<br>{top_inc['Incident_Category']}</div>
-          </div>
-          <div class="callout-body">
-            <b>{top_inc['Incident_Category']}</b> is <b>{top_inc['Share']:.0f}%</b> of incidents —
-            {int(top_inc['Total']):,} total producing <b>{int(top_inc['Total_Hrs']):,} hours</b> of delay.
-            Avg: <b>{top_inc['Avg_Delay']:.1f} min</b> · Severe rate: <b>{top_inc['Severe_Rate']*100:.0f}%</b>.
-          </div><br>
-          <div style="font-size:13px;color:rgba(147,0,10,0.7);">
-            ⚡ Diversion (6.5% of volume) = <b>27.8%</b> of all delay hours.
-          </div></div>""", unsafe_allow_html=True)
-    with c2:
-        with st.container(border=True):
-            card_title("Root Cause Distribution")
-            fig_tree = px.treemap(inc, path=["Incident_Category"], values="Total",
-                color="Avg_Delay",
-                color_continuous_scale=[[0,"#fef2f2"],[0.3,"#fca5a5"],[0.7,RED],[1,RED_DARK]],
-                custom_data=["Avg_Delay","Share","Severe_Rate"])
-            fig_tree.update_traces(
-                texttemplate="<b>%{label}</b><br>%{customdata[1]:.1f}%",
-                hovertemplate="<b>%{label}</b><br>Count: %{value:,}<br>Avg Delay: %{customdata[0]:.1f} min<br>Severe: %{customdata[2]:.1%}<extra></extra>",
-                textfont=dict(family="Inter",size=12))
-            fig_tree.update_layout(margin=dict(l=0,r=0,t=0,b=0), height=300)
-            st.plotly_chart(fig_tree, use_container_width=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
     with st.container(border=True):
-        card_title("Incident Category Breakdown")
-        disp = inc.rename(columns={"Incident_Category":"Category","Total":"Incidents",
-            "Avg_Delay":"Avg Delay (min)","Severe_Rate":"Severe Rate",
-            "Total_Hrs":"Total Hours","Share":"Share %"})
-        disp["Severe Rate"] = (disp["Severe Rate"]*100).round(1).astype(str)+"%"
-        disp["Total Hours"] = disp["Total Hours"].round(0).astype(int)
-        st.dataframe(disp[["Category","Incidents","Avg Delay (min)","Severe Rate","Total Hours","Share %"]],
-                     use_container_width=True, hide_index=True)
+        card_title("Wind Speed vs Severe Rate")
+        fig_w = px.line(wind_agg, x="Wind_Band", y=(wind_agg["Severe_Rate"]*100).round(1),
+            markers=True, color_discrete_sequence=[RED],
+            labels={"y":"Severe Rate %","Wind_Band":"Wind Speed (km/h)"})
+        fig_w.update_traces(line=dict(width=2.5), marker=dict(size=7))
+        fig_w = plotly_defaults(fig_w, 260)
+        fig_w.update_layout(showlegend=False,
+            xaxis=dict(showgrid=False),
+            yaxis=dict(showgrid=True, gridcolor="#f1f5f9", ticksuffix="%"))
+        st.plotly_chart(fig_w, use_container_width=True)
+
+    # ── 3. Route Risk Factors ─────────────────────────────────────────────────
+    subsection("3. Route Risk Factors")
+    with st.container(border=True):
+        card_title("Route Risk Profile — Why Some Routes Are Risky")
+        st.caption("Risk Score = Avg Delay × Headway × Severe Rate. Longer delays combined with infrequent service produce compounding passenger impact.")
+        top_risk = route_sum.sort_values("Risk_Score", ascending=False).head(20)
+        fig_r = px.scatter(top_risk, x="Avg_Headway", y="Avg_Delay", size="Incidents",
+            color="Severe_Rate", color_continuous_scale=[[0,"#fef2f2"],[0.5,RED],[1,RED_DARK]],
+            hover_name="Route_Number",
+            labels={"Avg_Headway":"Headway (min)","Avg_Delay":"Avg Delay (min)","Severe_Rate":"Severe Rate"})
+        fig_r = plotly_defaults(fig_r, 420)
+        fig_r.update_traces(marker=dict(line=dict(width=1,color="white")))
+        st.plotly_chart(fig_r, use_container_width=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PAGE 5 — PREDICTIVE ROUTING
+# PAGE 4 — 🔮 PREDICTIVE
 # ═══════════════════════════════════════════════════════════════════════════════
-elif "Predictive Routing" in page:
-    section_header("Future Operations", "Predictive Routing")
+elif "Predictive" in page:
+    section_header("Future Operations", "Predictive Analytics")
+    st.caption("What will happen? Machine learning model that forecasts delay duration given route, time, incident, and weather conditions.")
+
     if bundle is None:
         st.error(f"Model not found at `{MODEL_PATH}`. Run `train_model_v4.py` first.")
         st.stop()
@@ -425,7 +472,6 @@ elif "Predictive Routing" in page:
 
     def get_season(m):
         return "Winter" if m in [12,1,2] else "Spring" if m in [3,4,5] else "Summer" if m in [6,7,8] else "Fall"
-
     def get_headway(route, hour):
         if hw_df is None: return 3.9
         m = hw_df[(hw_df["Route_Number"]==route) & (hw_df["Hour"]==hour)]
@@ -451,10 +497,8 @@ elif "Predictive Routing" in page:
             card_title("Prediction Analysis")
             if run:
                 dt      = datetime.combine(sel_date, sel_time)
-                hour    = dt.hour
-                month   = dt.month
-                season  = get_season(month)
-                day     = dt.strftime("%A")
+                hour    = dt.hour; month = dt.month
+                season  = get_season(month); day = dt.strftime("%A")
                 rush    = 1 if hour in [7,8,9,16,17,18] else 0
                 weekend = 1 if day in ["Saturday","Sunday"] else 0
                 hw      = get_headway(float(route_num), hour)
@@ -506,14 +550,13 @@ elif "Predictive Routing" in page:
 
                 rush_str = "rush hour" if rush else "off-peak"
                 st.markdown(f"""<div class="pred-result">
-                  <div class="pred-label">Recommended Strategy</div>
+                  <div class="pred-label">Model Forecast</div>
                   <div style="font-size:14px;color:#475569;line-height:1.6;">
                     Route <b style="color:#0f172a">{route_num}</b> predicted
                     <b style="color:{tcolor}">{pred:.0f} min</b> behind schedule ({tier.lower()})
                     during <b style="color:#0f172a">{rush_str}</b>, {day}, {season}.
                     Incident: <b style="color:#0f172a">{incident_type}</b>.
                     Headway: <b style="color:#0f172a">{hw:.1f} min</b>.
-                    {'⚡ Deploy replacement vehicle or notify passengers.' if pred >= 15 else '✅ No immediate action required.'}
                   </div></div>""", unsafe_allow_html=True)
             else:
                 st.markdown("""<div style="background:#f8fafc;border:2px dashed #e2e8f0;border-radius:16px;
@@ -522,81 +565,103 @@ elif "Predictive Routing" in page:
                   <div style="font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#94a3b8;">
                     Configure inputs and click Run Prediction</div></div>""", unsafe_allow_html=True)
 
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.container(border=True):
+        card_title("Model Performance")
+        m1, m2, m3, m4 = st.columns(4)
+        with m1: kpi_card_dark("MAE (Test 2025)", "11.1", "min", "avg prediction error")
+        with m2: kpi_card_dark("R² (Test 2025)", "0.20", "", "variance explained")
+        with m3: kpi_card_dark("Within ±5 min", "60", "%", "test accuracy")
+        with m4: kpi_card_dark("Within ±10 min", "80", "%", "test accuracy")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PAGE 6 — VEHICLE INTEL
+# PAGE 5 — 💡 PRESCRIPTIVE
 # ═══════════════════════════════════════════════════════════════════════════════
-elif "Vehicle Intel" in page:
-    section_header("Fleet Analytics", "Vehicle Intel")
-    total_v = int(vi["Total_Vehicles"].iloc[0]) if "Total_Vehicles" in vi.columns else len(vi)
-    worst_v = vi.iloc[0]
+elif "Prescriptive" in page:
+    section_header("Action Plan", "Prescriptive Analytics")
+    st.caption("What should we do? Concrete actions and decisions derived from descriptive, diagnostic, and predictive findings.")
+
+    # ── 1. Fleet Management Actions ───────────────────────────────────────────
+    subsection("1. Fleet Management Actions")
     high_sv = vi[vi["Severe_Rate"] >= 0.35]
-
-    k1, k2, k3 = st.columns(3)
+    k1, k2 = st.columns(2)
     with k1:
-        st.markdown(f"""<div class="ttc-card">
-          <div class="kpi-label">Vehicles Tracked</div>
-          <div class="kpi-value-dark">{total_v:,}</div>
-          <div class="kpi-change-down">with mechanical incidents</div></div>""", unsafe_allow_html=True)
+        kpi_card_red("Replacement Candidates", f"{len(high_sv)}", "vehicles ≥35% severe rate")
     with k2:
-        st.markdown(f"""<div class="ttc-card">
-          <div class="kpi-label">Worst Vehicle</div>
-          <div class="kpi-value-red">{int(worst_v['Vehicle'])}</div>
-          <div class="kpi-change-down">{int(worst_v['Incidents'])} incidents · {worst_v['Avg_Delay']:.1f} min avg</div></div>""", unsafe_allow_html=True)
-    with k3:
-        st.markdown(f"""<div class="ttc-card">
-          <div class="kpi-label">Replacement Candidates (≥35% severe)</div>
-          <div class="kpi-value-red">{len(high_sv)}</div>
-          <div class="kpi-change-down">vehicles flagged for review</div></div>""", unsafe_allow_html=True)
+        total_mech_hrs = int(vi["Total_Hrs"].sum())
+        kpi_card_dark("Hours Lost (Top 30)", f"{total_mech_hrs:,}", "hrs",
+                      "mechanical downtime to reclaim")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    c1, c2 = st.columns([3, 2])
-    with c1:
-        with st.container(border=True):
-            card_title("Top 30 Vehicles by Mechanical Incidents")
-            vi_s = vi.sort_values("Incidents")
-            vi_s["Vehicle_Label"] = "Bus " + vi_s["Vehicle"].astype(int).astype(str)
-            fig_v = px.bar(vi_s, x="Incidents", y="Vehicle_Label", orientation="h",
-                color="Severe_Rate",
-                color_continuous_scale=[[0,"#fef2f2"],[0.3,"#fca5a5"],[0.7,RED],[1,RED_DARK]],
-                custom_data=["Avg_Delay","Total_Hrs"],
-                labels={"Incidents":"Mechanical Incidents","Vehicle_Label":"Vehicle"})
-            fig_v = plotly_defaults(fig_v, 600)
-            fig_v.update_layout(
-                coloraxis_colorbar=dict(title="Severe Rate", tickformat=".0%"),
-                xaxis=dict(showgrid=True, gridcolor="#f1f5f9"),
-                yaxis=dict(showgrid=False, tickfont=dict(size=10), categoryorder="total ascending"))
-            fig_v.update_traces(hovertemplate="<b>%{y}</b><br>Incidents: %{x}<br>Avg Delay: %{customdata[0]:.1f} min<extra></extra>")
-            st.plotly_chart(fig_v, use_container_width=True)
-    with c2:
-        with st.container(border=True):
-            card_title("Fleet Replacement Priority")
-            st.caption("Ranked by Severe Rate × Incidents")
-            priority = vi.sort_values(by=["Severe_Rate","Incidents"], ascending=False).head(15)
-            for i, (_, row) in enumerate(priority.iterrows(), 1):
-                sev_pct = int(row["Severe_Rate"]*100)
-                color   = RED if sev_pct >= 35 else ("#d97706" if sev_pct >= 20 else "#94a3b8")
-                st.markdown(f"""<div class="lb-row">
-                  <div style="display:flex;align-items:center;gap:12px;flex:1;">
-                    <span class="lb-rank">{i:02d}</span>
-                    <div><div class="lb-route">Bus {int(row['Vehicle'])}</div>
-                    <div class="lb-sub">{int(row['Incidents'])} incidents</div></div>
-                  </div>
-                  <div style="text-align:right;">
-                    <div style="font-weight:700;font-size:14px;color:{color};">{sev_pct}% severe</div>
-                    <div class="lb-sub">{row['Avg_Delay']:.1f} min avg</div>
-                  </div></div>""", unsafe_allow_html=True)
+    with st.container(border=True):
+        card_title("Fleet Replacement Priority — Top 15")
+        st.caption("Ranked by Severe Rate × Incident Count. High severity on frequent failures = highest operational risk.")
+        priority = vi.sort_values(by=["Severe_Rate","Incidents"], ascending=False).head(15)
+        for i, (_, row) in enumerate(priority.iterrows(), 1):
+            sev_pct = int(row["Severe_Rate"]*100)
+            color   = RED if sev_pct >= 35 else ("#d97706" if sev_pct >= 20 else "#94a3b8")
+            st.markdown(f"""<div class="lb-row">
+              <div style="display:flex;align-items:center;gap:12px;flex:1;">
+                <span class="lb-rank">{i:02d}</span>
+                <div><div class="lb-route">Bus {int(row['Vehicle'])}</div>
+                <div class="lb-sub">{int(row['Incidents'])} incidents · {row['Avg_Delay']:.1f} min avg</div></div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-weight:700;font-size:14px;color:{color};">{sev_pct}% severe</div>
+                <div class="lb-sub">action: review for replacement</div>
+              </div></div>""", unsafe_allow_html=True)
+
+    # ── 2. Route Operations Actions ───────────────────────────────────────────
+    subsection("2. Route Operations Actions")
+    top_risk = route_sum.sort_values("Risk_Score", ascending=False).head(5)
+    with st.container(border=True):
+        card_title("Top 5 Routes Requiring Intervention")
+        st.caption("Ranked by Risk Score (Avg Delay × Headway × Severe Rate).")
+        for i, (_, row) in enumerate(top_risk.iterrows(), 1):
+            if row["Avg_Headway"] >= 15:
+                rec = f"Deploy relief buses during peak hours (headway {row['Avg_Headway']:.0f} min is too long for this route's severity)"
+            elif row["Severe_Rate"] >= 0.85:
+                rec = f"Audit for recurring root cause — {int(row['Severe_Rate']*100)}% of delays are severe"
+            else:
+                rec = f"Monitor and review schedule adherence at peak"
+            st.markdown(f"""<div class="lb-row">
+              <div style="display:flex;align-items:center;gap:12px;flex:1;">
+                <span class="lb-rank">{i:02d}</span>
+                <div><div class="lb-route">Route {int(row['Route_Number'])}</div>
+                <div class="lb-sub">{row['Avg_Delay']:.1f}m avg · {int(row['Severe_Rate']*100)}% severe · headway {row['Avg_Headway']:.1f}m</div></div>
+              </div>
+              <div style="text-align:right;max-width:400px;">
+                <div style="font-size:13px;color:#475569;font-family:Inter,sans-serif;">{rec}</div>
+              </div></div>""", unsafe_allow_html=True)
+
+    # ── 3. Strategic Recommendations ──────────────────────────────────────────
+    subsection("3. Strategic Recommendations")
+    recs = [
+        ("🚨", "Prioritize Diversion Response Protocols",
+         "Diversion is only 6.5% of incidents but 27.8% of delay hours. Building a rapid diversion dispatch workflow would reclaim the largest share of lost hours for the smallest operational cost."),
+        ("🔧", "Replace 4 highest-risk buses immediately",
+         "Buses 8135, 8304, 8307, and 8332 each exceed 38% severe mechanical failure rate — 5–8× the fleet average. Replacing these 4 units would materially improve fleet reliability."),
+        ("❄️", "Add standby crews during winter rush",
+         "Winter + rush hour consistently produces the highest severe rate. Pre-positioning relief operators at 7–9am and 4–6pm Dec–Feb can absorb this predictable peak."),
+        ("📍", "Invest in high-risk routes 162, 96, 52",
+         "These three routes compound high delay, high severity, and low frequency. Route 162's 53 min avg delay with 19 min headway is the single worst passenger experience in the network."),
+    ]
+    for emoji, title, body in recs:
+        st.markdown(f"""<div style="background:#ffffff;border:1px solid #f1f5f9;border-radius:12px;
+                    padding:20px 24px;margin-bottom:16px;box-shadow:0 2px 8px rgba(25,28,29,0.03);">
+          <div style="display:flex;gap:16px;align-items:flex-start;">
+            <div style="font-size:28px;line-height:1;">{emoji}</div>
+            <div style="flex:1;">
+              <div style="font-family:'Public Sans',sans-serif;font-weight:700;font-size:16px;color:#0f172a;margin-bottom:8px;">{title}</div>
+              <div style="font-family:Inter,sans-serif;font-size:14px;color:#475569;line-height:1.6;">{body}</div>
+            </div></div></div>""", unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PAGE 7 — POWER BI REPORT
+# PAGE 6 — 📊 POWER BI REPORT
 # ═══════════════════════════════════════════════════════════════════════════════
 elif "Power BI" in page:
     section_header("Business Intelligence", "EDA Dashboard")
     st.caption("Interactive Power BI report — explore delay patterns, route performance, and neighbourhood analysis.")
-    components.iframe(
-        src=POWERBI_URL,
-        width=None,
-        height=760,
-        scrolling=True,
-    )
+    components.iframe(src=POWERBI_URL, width=None, height=760, scrolling=True)
